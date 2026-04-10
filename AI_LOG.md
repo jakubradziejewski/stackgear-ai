@@ -220,3 +220,345 @@
 **What you provided:** Yes — Alembic creates and owns it; contains one row with current revision ID; how Alembic tracks what has and hasn't been applied; never delete it manually
 **Problem/Correction:** None
 **My takeaway:** alembic_version is Alembic's internal tracking table — always present, never touched manually, updates automatically with each migration
+
+---
+
+## Entry 023
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Overview of remaining steps in the project after migrations were complete
+**What you provided:** Full ordered roadmap — schemas, seeds, auth, hardware routes, admin routes, tests, AI layer, frontend (Vue.js), deployment — with time estimates and suggested session splits
+**Problem/Correction:** None
+**My takeaway:** Nine steps remaining; schemas and seeds first to establish foundation and real data; auth before everything else because all other routes depend on it
+
+---
+
+## Entry 024
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Explanation of what schemas are needed, how they connect to SQLAlchemy models, and how they relate to Alembic
+**What you provided:** Full explanation of the three-layer data flow (DB → SQLAlchemy Model → Pydantic Schema); all schemas for User, Hardware, and Auth with reasoning for every field; `from_attributes=True` config explanation; EmailStr validation; clarification that schemas have zero connection to Alembic
+**Problem/Correction:** None
+**My takeaway:** Schemas are selective API views of model data — input schemas validate what comes in, response schemas control what goes out; `from_attributes=True` is required on every response schema; Alembic and schemas are completely independent layers
+
+---
+
+## Entry 025
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** How to test schema correctness and how schemas connect to FastAPI
+**What you provided:** Temporary test routes to verify schema wiring; FastAPI's automatic `/docs` UI powered by Pydantic schemas; five specific test cases covering valid input, invalid email, missing fields, nullable fields; explanation of 422 error structure
+**Problem/Correction:** None
+**My takeaway:** FastAPI generates `/docs` automatically from Pydantic schemas — test there before writing any frontend; 422 errors are fully automatic from Pydantic validation with no extra error handling code needed
+
+---
+
+## Entry 026
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Why Neon wasn't updated after testing schemas
+**What you provided:** Explanation that test routes only validated Pydantic schema shapes and never touched the database — no `get_db`, no session, no commit means no Neon writes; full diagram of the request-to-Neon journey showing where test routes stopped
+**Problem/Correction:** None
+**My takeaway:** Pydantic validation and database writes are completely separate steps — Neon only gets written to when a SQLAlchemy session commits; test routes were schema-only by design
+
+---
+
+## Entry 027
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Confirmation that schemas provide validation
+**What you provided:** Confirmed schemas are the validation layer; distinguished between schema validation (data shape/types) vs service validation (business rules) — both necessary, neither replaces the other
+**Problem/Correction:** None
+**My takeaway:** Schemas validate what the data is; services validate whether the operation is allowed — Pydantic handles the former automatically, service layer handles the latter manually
+
+---
+
+## Entry 028
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Comprehensive explanation of why seeds are needed and what they give us relative to the original task
+**What you provided:** Five reasons seeds matter — fulfills spec requirement, provides real development data, makes AI auditor meaningful, demonstrates edge case handling, ensures consistent test state; step-by-step breakdown of what the script will do with each anomaly in the seed data
+**Problem/Correction:** None
+**My takeaway:** Seeds are a hard spec requirement; the intentionally dirty data is an opportunity to demonstrate robustness and make the AI auditor feature genuinely impressive rather than trivial
+
+---
+
+## Entry 029
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** When AI investigation happens and the initial seeds.py implementation
+**What you provided:** Two audit trigger options — on-demand button vs automatic on login — with recommendation for Option A (on-demand) for reviewed projects; full seeds.py with anomaly handling, duplicate ID resolution, date format parsing, brand normalization, j.doe user creation, notes/history merging, and anomaly report output
+**Problem/Correction:** None at time of writing
+**My takeaway:** AI audit on-demand button is cleaner for a reviewed project; seeds.py runs once, handles all dirty data explicitly, and preserves anomalies for the auditor to find — idempotent via COUNT check
+
+---
+
+## Entry 030
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Correction — seeds.py shouldn't pre-detect anomalies, that's the AI auditor's job
+**What you provided:** Revised seeds.py with all anomaly detection removed — only technically necessary transformations remain (date parsing, status mapping, duplicate ID resolution, brand normalization); anomalies preserved as raw data for Gemini to discover
+**Problem/Correction:** Previous seeds.py was doing the AI auditor's job by hardcoding anomaly detection — defeats the purpose of the AI layer entirely
+**My takeaway:** seeds.py only handles what's technically required to insert data without crashing; anomaly detection belongs entirely to the AI layer which discovers issues from live data at runtime
+
+---
+
+## Entry 031
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Why j.doe user creation was in seeds.py and whether it should be there
+**What you provided:** Confirmed it was the same mistake as before — pre-reading seed data and writing special-case logic for something "noticed" in advance; removed j.doe creation, assignedTo mapping, and history merging; seeds.py now only maps known fields to known columns and ignores everything else
+**Problem/Correction:** Two consecutive versions of seeds.py were doing the AI auditor's job manually — should have been caught in the first revision
+**My takeaway:** seeds.py is a dumb data loader — it maps known fields to known columns and ignores everything else; unresolved assignments, unknown fields, and data inconsistencies are raw material for the AI auditor to find at runtime
+
+---
+
+## Entry 032
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Whether parse_brand and parse_date should be handled by Pydantic schemas instead of seeds.py
+**What you provided:** Explanation that Pydantic only runs on API requests — seeds.py bypasses it entirely; `parse_brand` removed as unnecessary cleanup that belongs to the auditor; `parse_date` kept as a genuine technical necessity since Postgres cannot store raw strings as a Date type; three remaining parsers justified as technically required not anomaly detection
+**Problem/Correction:** parse_brand was doing silent normalization that belongs to the auditor — should have been caught earlier
+**My takeaway:** Pydantic only validates API input — seeds bypass it entirely; only keep parsers that prevent a crash, not parsers that clean up data the auditor should find
+
+---
+
+## Entry 033
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Whether Pydantic schemas should be used in seeds.py for consistency, given we built them for this purpose
+**What you provided:** Confirmed seeds should use schemas — single source of truth for validation; revised seeds.py to validate each item through HardwareCreate before inserting; Pydantic now handles date parsing and null coercion; `map_status` kept because status isn't part of HardwareCreate by design (new hardware always starts as AVAILABLE)
+**Problem/Correction:** Multiple previous versions of seeds.py bypassed Pydantic entirely — should have used schemas from the start for consistency
+**My takeaway:** Seeds should validate through the same schemas as the API — single source of truth; the only seed-specific logic remaining is `map_status` because HardwareCreate intentionally excludes status
+
+---
+
+## Entry 034
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Move JSON to a `data/` folder, seeding to a `setup/` folder, rename app to stackgear-ai, and proposal for splitting seed.py into multiple files
+**What you provided:** Three-file split — `seed_users.py`, `seed_hardware.py`, `seed.py` as orchestrator; JSON in `data/seed_hardware.json`; Path resolution using `__file__` so imports work regardless of where the script is run; run via `-m setup.seed` to preserve import resolution
+**Problem/Correction:** None
+**My takeaway:** Split by single responsibility — each file has one job; orchestrator only connects them; run with `-m` flag to preserve relative imports from project root
+
+---
+
+## Entry 035
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Move setup/ directory inside app/ instead of project root
+**What you provided:** Updated structure with `app/setup/`, corrected Path resolution to go three levels up to reach `data/`, updated run command to `app.setup.seed`
+**Problem/Correction:** None
+**My takeaway:** `setup/` inside `app/` keeps project root clean; path resolution needs one extra `.parent` since the file is now one level deeper; always use `-m` flag with the full dotted module path
+
+---
+
+## Entry 036
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Fix for `ModuleNotFoundError: No module named 'setup'`
+**What you provided:** Fixed imports in seed.py from `setup.seed_users` to `app.setup.seed_users` — Python resolves from project root not relative to the file
+**Problem/Correction:** Previous imports used `from setup.x` which only works when `setup/` is at project root — should have updated to full dotted path when moving inside `app/`
+**My takeaway:** All imports inside `app/` must use full `app.x.y` paths — Python always resolves from project root regardless of where the importing file lives
+
+---
+
+## Entry 037
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Fix for `TimeoutError` when connecting to Neon during seeding
+**What you provided:** Three diagnostic steps to isolate whether the issue is env config, raw asyncpg connection, or Neon compute suspension
+**Problem/Correction:** None yet — awaiting diagnostic output
+**My takeaway:** Timeout on asyncpg connect is almost always env misconfiguration, wrong URL, or Neon free tier compute suspension — diagnose in that order
+
+---
+
+## Entry 038
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Fix for empty DATABASE_URL causing invalid DSN error
+**What you provided:** Three possible causes — wrong .env location, syntax error in .env, relative path resolution issue; recommended fix is explicit absolute path in config.py using `Path(__file__)` so .env is always found regardless of where the script is run from
+**Problem/Correction:** Misread previous error output and incorrectly diagnosed empty URL — Check 1 had actually passed
+**My takeaway:** Always use `Path(__file__)` in config.py to resolve .env location absolutely — relative paths break when running scripts from directories other than project root
+
+---
+
+## Entry 039
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Why Alembic connected fine but seed script keeps timing out
+**What you provided:** Root cause identified as missing `NullPool` — Alembic used it, seed script didn't; without NullPool SQLAlchemy tries to initialize a connection pool which causes timeout issues with Neon serverless; fix is adding `poolclass=NullPool` to seed engine
+**Problem/Correction:** Should have used NullPool in seed engine from the start — same reason it was added to Alembic
+**My takeaway:** One-shot scripts always use NullPool; only the long-running FastAPI server uses the default connection pool with `pool_size` and `pool_pre_ping`
+
+---
+
+## Entry 040
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Thorough investigation of persistent TimeoutError in seed script after NullPool was already added
+**What you provided:** Three isolated diagnostic checks — bare asyncpg, SQLAlchemy with NullPool without app code, step-by-step seed.py flow — to pinpoint exactly which layer and which line is failing
+**Problem/Correction:** None yet — narrowing down to SSL handling difference between Alembic and seed engine
+**My takeaway:** Isolate layer by layer — asyncpg direct, then SQLAlchemy, then app code — to find exactly where the timeout originates
+
+---
+
+## Entry 041
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Further investigation after all three diagnostic checks showed timeout at query execution (Step 5)
+**What you provided:** Targeted SSL configuration tests — `ssl=True` vs `ssl='require'` vs SSL in URL string; asyncpg version check; suggested getting asyncpg-specific connection string from Neon dashboard
+**Problem/Correction:** Kept suggesting different SSL parameter combinations instead of immediately copying the known-working Alembic configuration
+**My takeaway:** When something works in one place and not another, copy it exactly rather than experimenting — Alembic config was the reference all along
+
+---
+
+## Entry 042
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Testing whether `channel_binding` being stripped from the original URL was causing timeouts
+**What you provided:** Two targeted tests — `channel_binding` via `server_settings` and `sslmode` back in URL string; also suggested getting fresh asyncpg-specific connection string from Neon dashboard
+**Problem/Correction:** Should have considered channel_binding requirement earlier when diagnosing SSL issues
+**My takeaway:** Neon may require channel_binding alongside SSL — test both together; always check Neon dashboard for driver-specific connection strings
+
+---
+
+## Entry 043
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Explanation of why Neon shows "suspended until a client connects" yet connection still times out
+**What you provided:** Cold start explanation — Neon free tier suspends after 5 minutes; fix is adding `connect_timeout: 30` to allow wake-up time; recommended waking compute manually via dashboard then running seed immediately within the 5-minute active window; README note template for future reference
+**Problem/Correction:** Should have identified Neon cold start as the primary suspect much earlier given the "suspended" message was visible in Alembic output
+**My takeaway:** Neon free tier suspends after 5 minutes — always check compute status before running scripts; wake via dashboard then run immediately within the 5-minute active window
+
+---
+
+## Entry 044
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Definitive connection fix after `sslmode` keyword error appeared
+**What you provided:** Stopped experimenting — copied exact Alembic engine config which is known to work (`ssl='require'`, `NullPool`); identified that Neon compute must show Active before attempting connection
+**Problem/Correction:** Kept suggesting different SSL parameter combinations when Alembic config was the known-working reference all along
+**My takeaway:** When debugging connection issues, always copy the known-working config exactly before experimenting with alternatives
+
+---
+
+## Entry 045
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** How to wake Neon from terminal without a dashboard button, and further investigation of root cause
+**What you provided:** Bare asyncpg wake attempt; redirected to inspect full masked URL structure as all connection attempts were failing regardless of approach
+**Problem/Correction:** Should have asked to see the full masked URL much earlier in debugging — would have caught malformed URL immediately
+**My takeaway:** When all connection approaches fail, inspect the URL structure itself before trying more connection variations
+
+---
+
+## Entry 046
+**Date:** 2026-04-09
+**Tool:** Claude
+**What I asked for:** Root cause of all persistent timeouts
+**What you provided:** Found root cause — DATABASE_URL in .env was malformed, missing `//` and username, making every connection attempt fail with a misleading timeout rather than a clear format error; correct URL format provided
+**Problem/Correction:** Should have inspected the masked URL format in the very first debugging session — a malformed URL causes misleading timeouts not a clear "invalid URL" message
+**My takeaway:** Always verify full URL structure early in connection debugging — `postgresql+asyncpg://user:password@host/db` with no query params; a malformed URL produces timeouts not parse errors
+
+---
+
+## Entry 047
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Revert to beginning of seed development — first understand Neon connections properly, then build seed files
+**What you provided:** Full six-step connection verification flow — URL format validation, raw asyncpg check, SQLAlchemy with NullPool, app database module; each step builds on the previous; run commands for each
+**Problem/Correction:** Should have done systematic connection verification at the very start before writing any seed code
+**My takeaway:** Always verify connection in isolation layer by layer before writing application code that depends on it; never assume a working connection — test it explicitly
+
+---
+
+## Entry 048
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Results of connection verification and next steps
+**What you provided:** Confirmed all three connection layers work (asyncpg, SQLAlchemy, app database module); explained ROLLBACK at end of read-only operations is normal not an error; ready to build seed files cleanly
+**Problem/Correction:** Step 3 check script had a SyntaxError in f-string — should have tested the command before providing it
+**My takeaway:** All connection layers verified working; ROLLBACK on read-only sessions is normal SQLAlchemy behaviour; seed files can now be built with confidence
+
+---
+
+## Entry 049
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Final clean seed files written from scratch with verified connection
+**What you provided:** Three clean files — `seed_users.py`, `seed_hardware.py`, `seed.py` — plus raw JSON in `data/seed_hardware.json`; uses NullPool, validates hardware through HardwareCreate schema, maps status to enum via `map_status`, handles duplicate IDs silently, ignores unknown fields (assignedTo, history), idempotent via COUNT check
+**Problem/Correction:** None
+**My takeaway:** Clean seed implementation with single responsibility per file; NullPool for one-shot scripts; Pydantic schemas used for validation even in seeding for consistency; anomalies left intact for AI auditor to discover at runtime
+
+---
+
+## Entry 050
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Fix for `ValueError: password cannot be longer than 72 bytes` from passlib during seeding
+**What you provided:** Root cause — known passlib incompatibility with bcrypt 4.x; passlib's internal bug-detection self-test trips over the 72-byte limit on newer bcrypt versions; two fixes offered — pin `bcrypt<4.0.0` or replace passlib entirely with direct bcrypt library calls; recommended the latter since passlib is unmaintained
+**Problem/Correction:** None
+**My takeaway:** passlib is unmaintained and breaks with bcrypt 4.x — replace it with the bcrypt library directly; `hash_password` becomes `bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()` and `verify_password` becomes `bcrypt.checkpw(plain.encode(), hashed.encode())`
+
+---
+
+## Entry 051
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Confirmation that seed output was expected
+**What you provided:** Partially — 10/11 items inserted is a problem; iPad Pro 12.9 skipped entirely because Pydantic only parses ISO 8601 dates and DD-MM-YYYY gets rejected; item not in database means auditor has nothing to find; `parse_date` with multi-format support needs to return as a technical necessity not anomaly detection; requested project structure and model files to review the full scaffold
+**Problem/Correction:** Earlier decision to let Pydantic handle date parsing was incomplete — Pydantic's `date` type only accepts ISO 8601, so non-standard formats must be pre-parsed before reaching the schema
+**My takeaway:** Pydantic date validation rejects non-ISO formats entirely rather than trying alternatives — pre-parse ambiguous date strings before passing to schemas; all seed items must reach the database for the auditor to have something to work with
+
+---
+
+## Entry 052
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Best way to handle non-ISO date formats so all 11 seed items reach the database, ideally using Pydantic
+**What you provided:** Custom `field_validator` with `mode="before"` on `HardwareCreate` — tries `YYYY-MM-DD` then `DD-MM-YYYY` before Pydantic's own type coercion runs; shared `HardwareBase` class to avoid duplicating the validator on `HardwareCreate` and `HardwareUpdate`; clear-and-reseed commands
+**Problem/Correction:** None
+**My takeaway:** `field_validator` with `mode="before"` is the correct place for format normalisation — it runs before Pydantic's type system so the string is converted to a date object transparently; `seeds.py` needs no changes; this is the right layer for technical parsing as opposed to anomaly detection
+
+---
+
+## Entry 053
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Next AI log entry and full project stage analysis against the brief
+**What you provided:** Log entries 050–053 in markdown; structured breakdown of current scaffold state — what's built, how pieces connect, what's missing across all three brief pillars, and recommended build order
+**Problem/Correction:** None
+**My takeaway:** Foundation layer is complete and solid — models, schemas, security, seeding, and DB connection all verified; application logic (routes, rental engine, AI layer) hasn't started yet; next phase is auth endpoints then hardware CRUD
+
+---
+
+## Entry 054
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Auth and user creation files written with explanation of how each connects to the existing architecture
+**What you provided:** Three files — `app/core/deps.py` (shared `get_current_user` + `require_admin` dependencies), `app/routers/auth.py` (`POST /auth/login` returning JWT), `app/routers/users.py` (`POST /users` admin-guarded account creation) — plus updated `main.py`; each file prefaced with explanation of its role and how it wires into existing models, schemas, and security layer
+**Problem/Correction:** None
+**My takeaway:** `deps.py` belongs in `core/` not `routers/` because it's shared across all future routers; `_: User = Depends(require_admin)` is the idiomatic way to apply a guard without needing the result; `await db.flush()` populates the ORM object's `id` within the transaction before the commit; vague login errors ("Incorrect email or password") are intentional security practice
+
+---
+
+## Entry 055
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Why hitting POST routes in the browser address bar returns "Method Not Allowed"
+**What you provided:** Explanation that browsers send GET requests from the address bar — correct tools are Swagger UI at `/docs`, curl, or HTTPie; full step-by-step for each including the login → copy token → authorize → create user flow in Swagger
+**Problem/Correction:** None
+**My takeaway:** Browser address bar is GET only; use `/docs` for manual testing during development — FastAPI generates it automatically and handles Bearer token injection after clicking "Authorize"
+
+---
+
+## Entry 056
+**Date:** 2026-04-10
+**Tool:** Claude
+**What I asked for:** Why Swagger's Authorize dialog shows a full OAuth2 form with client credentials
+**What you provided:** Explanation that `OAuth2PasswordBearer` implements the full OAuth2 spec which Swagger renders as a multi-field form; fix is to swap to `HTTPBearer` in `deps.py` — Swagger then shows a single token input field; token extraction changes from `token: str` to `credentials.credentials`
+**Problem/Correction:** None
+**My takeaway:** `OAuth2PasswordBearer` is correct for full OAuth2 flows but overkill here — `HTTPBearer` gives a cleaner Swagger experience and is the right choice when you're issuing your own JWTs without a separate OAuth2 authorization server
+
+---
