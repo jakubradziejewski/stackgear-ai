@@ -1,15 +1,14 @@
 import asyncio
 from logging.config import fileConfig
-from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 from alembic import context
 from app.core.config import settings
-from app.core.database import Base
+from app.core.database import Base, create_database_engine
 from app.models import User, Hardware
 
 config = context.config
 fileConfig(config.config_file_name)
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+config.set_main_option("sqlalchemy.url", settings.async_database_url)
 
 target_metadata = Base.metadata
 
@@ -37,11 +36,7 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable = create_async_engine(
-        settings.DATABASE_URL,
-        connect_args={"ssl": "require"},
-        poolclass=pool.NullPool,
-    )
+    connectable = create_database_engine(poolclass=pool.NullPool, use_pool=False)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
