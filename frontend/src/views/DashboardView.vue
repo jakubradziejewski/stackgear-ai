@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
-import { fetchHardware } from '../api/hardware'
+import { fetchHardware, rentHardware, returnHardware } from '../api/hardware'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -22,6 +22,24 @@ async function loadHardware() {
     })
   } catch (e) {
     error.value = 'Could not load hardware'
+  }
+}
+
+async function handleRent(id) {
+  try {
+    await rentHardware(authStore.token, id)
+    await loadHardware()
+  } catch (e) {
+    alert(e.message)
+  }
+}
+
+async function handleReturn(id) {
+  try {
+    await returnHardware(authStore.token, id)
+    await loadHardware()
+  } catch (e) {
+    alert(e.message)
   }
 }
 
@@ -74,6 +92,7 @@ onMounted(() => loadHardware())
           <th style="padding: 8px">Brand</th>
           <th style="padding: 8px">Purchase Date</th>
           <th style="padding: 8px">Status</th>
+          <th style="padding: 8px">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -90,6 +109,23 @@ onMounted(() => loadHardware())
               background: item.status === 'available' ? '#d4edda' : item.status === 'in_use' ? '#cce5ff' : item.status === 'repair' ? '#f8d7da' : '#e2e3e5',
               color: item.status === 'available' ? '#155724' : item.status === 'in_use' ? '#004085' : item.status === 'repair' ? '#721c24' : '#383d41',
             }">{{ item.status }}</span>
+          </td>
+          <td style="padding: 8px">
+            <button
+              v-if="item.status === 'available'"
+              @click="handleRent(item.id)"
+              style="font-size: 0.8rem; padding: 3px 10px; cursor: pointer"
+            >
+              Rent
+            </button>
+            <button
+              v-else-if="item.status === 'in_use' && (authStore.isAdmin || item.rented_by_id === authStore.user?.id)"
+              @click="handleReturn(item.id)"
+              style="font-size: 0.8rem; padding: 3px 10px; cursor: pointer"
+            >
+              Return
+            </button>
+            <span v-else style="font-size: 0.8rem; color: #999">—</span>
           </td>
         </tr>
       </tbody>
