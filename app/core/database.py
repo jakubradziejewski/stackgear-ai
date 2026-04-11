@@ -7,12 +7,14 @@ from app.core.config import settings
 
 
 def create_database_engine(*, echo: bool = False, use_pool: bool = True, **kwargs):
-    engine_kwargs = {
+    engine_kwargs: dict = {
         "echo": echo,
         "connect_args": settings.asyncpg_connect_args,
     }
 
-    if use_pool:
+    # Connection pooling is only useful (and safe) against a remote server.
+    # asyncpg on localhost, and especially in tests with NullPool, must skip it.
+    if use_pool and not settings._is_local:
         engine_kwargs.update(
             {
                 "pool_size": 5,
@@ -40,11 +42,13 @@ engine = create_database_engine(echo=True)
 AsyncSessionLocal = async_sessionmaker(
     engine,
     class_=AsyncSession,
-    expire_on_commit=False
+    expire_on_commit=False,
 )
+
 
 class Base(DeclarativeBase):
     pass
+
 
 async def get_db():
     async with AsyncSessionLocal() as session:
