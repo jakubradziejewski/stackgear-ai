@@ -560,5 +560,202 @@
 **What you provided:** Explanation that `OAuth2PasswordBearer` implements the full OAuth2 spec which Swagger renders as a multi-field form; fix is to swap to `HTTPBearer` in `deps.py` — Swagger then shows a single token input field; token extraction changes from `token: str` to `credentials.credentials`
 **Problem/Correction:** None
 **My takeaway:** `OAuth2PasswordBearer` is correct for full OAuth2 flows but overkill here — `HTTPBearer` gives a cleaner Swagger experience and is the right choice when you're issuing your own JWTs without a separate OAuth2 authorization server
+---
+
+## Entry 057
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Review the current state of the Hardware Hub project (entries up to #56) and plan next actions.
+**What you provided:** A full project state audit with a visual status board categorising 20+ items as done / missing / needs-fix, plus a prioritised action plan.
+**Problem/Correction:** None
+**My takeaway:** The backend foundation (auth, models, schemas, seed) is complete, but the hardware CRUD router, rental engine, AI layer, tests, and entire Vue frontend still need to be built — and the DB engine needs to be switched from PostgreSQL to SQLite first.
+**Data Anomalies Found:** (1) `config.py` / `database.py` use PostgreSQL + asyncpg despite the brief specifying a file-based DB (SQLite). (2) `HardwareStatus.UNKNOWN` exists in `enums.py` as a seed fallback but is not defined in the project spec — may cause confusion in business logic.
 
 ---
+
+## Entry 058
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Review the seed JSON file and discuss the PostgreSQL vs SQLite decision.
+**What you provided:** Full anomaly audit of seed_hardware.json (6 issues flagged) and confirmed the Postgres-on-cloud approach is valid, with a note about the SSL handling edge case.
+**Problem/Correction:** None
+**My takeaway:** Keep PostgreSQL for cloud deployment; fix 6 seed data issues before seeding (future date, duplicate ID, brand typo, date format, unknown device, misplaced history note, orphaned assignedTo field).
+**Data Anomalies Found:** (1) Item #6 purchaseDate 2027 is a future date. (2) Item #4 duplicated — second entry appears to be test data. (3) Item #9 brand "Appel" is a typo. (4) Item #9 date in DD-MM-YYYY format. (5) Item #10 status "Unknown" with no useful data. (6) Item #11 `history` field not in schema — liquid damage note should move to `notes`. (7) Item #7 `assignedTo` email field not in schema — will be silently dropped.
+
+---
+
+## Entry 059
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Fix the database/config files and show how to test them.
+**What you provided:** Updated `config.py` (conditional SSL based on host), updated `database.py` (pool only for remote), and a 13-test pytest file covering URL normalisation and SSL logic — no live DB required.
+**Problem/Correction:** None
+**My takeaway:** SSL and connection pooling are now environment-aware — cloud gets both, local dev gets neither, and the distinction is driven by a single `_is_local` property.
+
+---
+
+## Entry 060
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** How to run the tests using `uv` instead of `pip`.
+**What you provided:** The two `uv` commands needed (`uv add --dev` and `uv run pytest`), plus a one-off alternative with `--with`.
+**Problem/Correction:** None
+**My takeaway:** Use `uv add --dev pytest pytest-asyncio` once, then `uv run pytest` for all subsequent test runs.
+
+---
+
+## Entry 061
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Drop the seeded data and re-seed to verify the DB connection is working end-to-end.
+**What you provided:** Three sequential `uv run` commands — confirm URL, drop/recreate tables, reseed — plus a verification query that prints row counts and all hardware items.
+**Problem/Correction:** None
+**My takeaway:** The reset-and-reseed pattern (drop_all → create_all → seed) is the reliable way to verify the full DB pipeline is working against the live cloud DB.
+
+---
+
+## Entry 062
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Summary of what changed in config/database and how all connection string formats are handled.
+**What you provided:** A table of all 6 URL variants with their SSL/pool outcomes, plus a concise 2-point summary of what actually changed.
+**Problem/Correction:** None
+**My takeaway:** The user's Neon URL (`postgresql+asyncpg://`) passes through unchanged — the scheme replacement is a no-op, SSL and pool are on because the host is remote.
+
+---
+
+## Entry 063
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Assessment of remaining work across all three pillars and a recommended build order.
+**What you provided:** Visual progress board across all pillars + a 4-step prioritised build order: hardware router → rental tests → AI auditor → Vue frontend.
+**Problem/Correction:** None
+**My takeaway:** Hardware router is the critical path item — everything else is blocked until CRUD + rent/return exists on the backend.
+
+---
+
+## Entry 064
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Build the hardware router.
+**What you provided:** `app/routers/hardware.py` with 8 endpoints covering full CRUD, repair toggle, and rent/return with all business logic guards; updated `main.py` to register it.
+**Problem/Correction:** None
+**My takeaway:** All rental guards are in the router — can't rent `repair`/`in_use`/`unknown`, can't return `available`, can't delete or toggle `in_use`, only renter or admin can return.
+
+---
+
+## Entry 065
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Fix the server startup command.
+**What you provided:** Replace `fastapi dev` with `uv run uvicorn app.main:app --reload`.
+**Problem/Correction:** Used `fastapi dev` in previous response — user was already using uvicorn directly.
+**My takeaway:** Use `uv run uvicorn app.main:app --reload` for this project, not the fastapi CLI.
+
+---
+
+## Entry 066
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Explanation of why PATCH is used and what to do next.
+**What you provided:** Explanation of PATCH vs PUT with `exclude_unset`, distinction between the two PATCH endpoints, and a recommended Vue project structure to scaffold next.
+**Problem/Correction:** None
+**My takeaway:** Start the Vue frontend now — backend has enough endpoints to drive login, dashboard, and admin panel; scaffold with Vite + Pinia + Vue Router + axios.
+
+---
+
+## Entry 067
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Start Vue frontend setup slowly with explanations.
+**What you provided:** Asked to verify Node.js is installed before doing anything — one step at a time.
+**Problem/Correction:** Tried nodeenv first unnecessarily — user already had Node 24 installed globally.
+**My takeaway:** Always check `node --version` first before trying to install Node via other means.
+
+---
+
+## Entry 068
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Create the Vue project.
+**What you provided:** Single `npm create vue@latest` command with exact answers to the setup questions, then three follow-up commands to install and run.
+**Problem/Correction:** Tried nodeenv first unnecessarily — user already had Node 24 installed globally.
+**My takeaway:** Node was already available globally; use `npm create vue@latest` directly to scaffold the Vue project.
+
+---
+
+## Entry 069
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** What to commit from the new Vue project.
+**What you provided:** Commit everything except `node_modules` — it's already in the scaffolded `.gitignore`.
+**Problem/Correction:** None
+**My takeaway:** Vue scaffolder auto-generates a correct `.gitignore`; just `git add frontend/` and commit.
+
+---
+
+## Entry 070
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Next steps with the Vue frontend after reviewing the scaffold structure.
+**What you provided:** Identified 3 issues in the scaffold (App.vue missing RouterView, counter.js is boilerplate, router likely empty) and proposed fixing them one at a time.
+**Problem/Correction:** None
+**My takeaway:** Fix App.vue first, then replace counter store with authStore, then add LoginView — one step at a time.
+
+---
+
+## Entry 071
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Step 2 of Vue setup — auth store.
+**What you provided:** Deleted counter.js, created authStore with token/user state persisted to localStorage, plus isLoggedIn/isAdmin computed and setAuth/logout methods.
+**Problem/Correction:** None
+**My takeaway:** Auth store reads from localStorage on init so the user stays logged in across page refreshes.
+
+---
+
+## Entry 072
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Step 3 — login view and router wiring.
+**What you provided:** `LoginView.vue` with form, fetch call to FastAPI, JWT decode for user info, error handling; updated router with login route and auth guard.
+**Problem/Correction:** None
+**My takeaway:** Login decodes the JWT payload client-side to extract email and is_admin without needing a separate /me endpoint.
+
+---
+
+## Entry 073
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Confirmed login works, needed logout on dashboard.
+**What you provided:** Explained what the login flow did end-to-end, added logout button and user info display to DashboardView.
+**Problem/Correction:** None
+**My takeaway:** Full auth cycle working — login, JWT stored in localStorage, route guard, logout clears state and redirects.
+
+---
+
+## Entry 074
+
+**Date:** April 11, 2026
+**Tool:** Claude
+**What I asked for:** Display all hardware items on the dashboard.
+**What you provided:** Created `src/api/hardware.js` with a fetch function, updated DashboardView to load and display hardware in a table with colour-coded status badges.
+**Problem/Correction:** None
+**My takeaway:** API calls live in `src/api/` and are called from views via `onMounted` — clean separation between data fetching and display.
