@@ -8,10 +8,18 @@ const authStore = useAuthStore()
 const router = useRouter()
 const hardware = ref([])
 const error = ref(null)
+const statusFilter = ref('')
+const sortBy = ref('name')
+const order = ref('asc')
 
 async function loadHardware() {
+  error.value = null
   try {
-    hardware.value = await fetchHardware(authStore.token)
+    hardware.value = await fetchHardware(authStore.token, {
+      status: statusFilter.value,
+      sort_by: sortBy.value,
+      order: order.value,
+    })
   } catch (e) {
     error.value = 'Could not load hardware'
   }
@@ -26,13 +34,35 @@ onMounted(() => loadHardware())
 </script>
 
 <template>
-  <div style="padding: 2rem">
+  <div style="padding: 2rem; max-width: 960px; margin: 0 auto">
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem">
-      <h1>Hardware Hub</h1>
+      <h1 style="margin: 0">Hardware Hub</h1>
       <div style="display: flex; align-items: center; gap: 1rem">
         <span style="font-size: 0.85rem; color: #666">{{ authStore.user?.email }}</span>
         <button @click="logout">Sign out</button>
       </div>
+    </div>
+
+    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap">
+      <select v-model="statusFilter" @change="loadHardware">
+        <option value="">All statuses</option>
+        <option value="available">Available</option>
+        <option value="in_use">In Use</option>
+        <option value="repair">Repair</option>
+        <option value="unknown">Unknown</option>
+      </select>
+
+      <select v-model="sortBy" @change="loadHardware">
+        <option value="name">Sort by Name</option>
+        <option value="purchase_date">Sort by Date</option>
+        <option value="status">Sort by Status</option>
+      </select>
+
+      <select v-model="order" @change="loadHardware">
+        <option value="asc">Ascending</option>
+        <option value="desc">Descending</option>
+      </select>
     </div>
 
     <p v-if="error" style="color: red">{{ error }}</p>
@@ -47,11 +77,7 @@ onMounted(() => loadHardware())
         </tr>
       </thead>
       <tbody>
-        <tr
-          v-for="item in hardware"
-          :key="item.id"
-          style="border-bottom: 1px solid #eee"
-        >
+        <tr v-for="item in hardware" :key="item.id" style="border-bottom: 1px solid #eee">
           <td style="padding: 8px">{{ item.name }}</td>
           <td style="padding: 8px">{{ item.brand || '—' }}</td>
           <td style="padding: 8px">{{ item.purchase_date || '—' }}</td>
@@ -69,6 +95,7 @@ onMounted(() => loadHardware())
       </tbody>
     </table>
 
-    <p v-else-if="!error">Loading…</p>
+    <p v-else-if="!error" style="color: #666">No items found.</p>
+
   </div>
 </template>
