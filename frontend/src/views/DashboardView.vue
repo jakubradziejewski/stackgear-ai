@@ -58,6 +58,7 @@ onMounted(() => loadHardware())
       <h1 style="margin: 0">Hardware Hub</h1>
       <div style="display: flex; align-items: center; gap: 1rem">
         <span style="font-size: 0.85rem; color: #666">{{ authStore.user?.email }}</span>
+        <button v-if="authStore.isAdmin" @click="router.push('/admin')">Admin panel</button>
         <button @click="logout">Sign out</button>
       </div>
     </div>

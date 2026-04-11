@@ -36,3 +36,40 @@ export async function returnHardware(token, id) {
   }
   return response.json()
 }
+
+export async function createHardware(token, payload) {
+  const response = await fetch(`${BASE_URL}/hardware`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.detail || 'Failed to create hardware')
+  return data
+}
+
+export async function deleteHardware(token, id) {
+  const response = await fetch(`${BASE_URL}/hardware/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    const data = await response.json()
+    throw new Error(data.detail || 'Failed to delete hardware')
+  }
+}
+
+export async function toggleRepair(token, id) {
+  const response = await fetch(`${BASE_URL}/hardware/${id}/repair`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!response.ok) {
+    const data = await response.json()
+    throw new Error(data.detail || 'Failed to toggle repair')
+  }
+  return response.json()
+}
