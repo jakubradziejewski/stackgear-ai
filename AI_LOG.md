@@ -759,3 +759,102 @@
 **What you provided:** Created `src/api/hardware.js` with a fetch function, updated DashboardView to load and display hardware in a table with colour-coded status badges.
 **Problem/Correction:** None
 **My takeaway:** API calls live in `src/api/` and are called from views via `onMounted` — clean separation between data fetching and display.
+
+---
+
+## Entry 075
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Assessment of where to go next after the hardware table was working.
+**What you provided:** Visual remaining work board and three options: finish dashboard (A), write rental tests (B), AI auditor (C). Recommended A first.
+**Problem/Correction:** None
+**My takeaway:** Dashboard with working rent/return is the highest priority — completes Pillar 2 and makes the product demonstrable end-to-end.
+
+---
+
+## Entry 076
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Add sort and filter to the dashboard.
+**What you provided:** Updated DashboardView with three dropdowns (status filter, sort by, order) that trigger a reload on change. Fixed em dash encoding issue.
+**Problem/Correction:** None
+**My takeaway:** Filters are refs wired to `@change="loadHardware"` — the existing fetchHardware API function already supported filter params so no backend changes were needed.
+
+---
+
+## Entry 077
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Add rent/return buttons to the dashboard.
+**What you provided:** Added rentHardware and returnHardware to the API file, added handlers to DashboardView, and added a conditional Actions column — Rent for available, Return for in_use (own items or admin), dash otherwise.
+**Problem/Correction:** Gave fragmented instructions first — user needed the complete file, delivered that instead.
+**My takeaway:** When changes touch multiple parts of a file always deliver the complete file rather than partial snippets.
+
+---
+
+## Entry 078
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Clarification on what rental tests mean in the brief.
+**What you provided:** Explained the 3 required automated pytest tests — cannot rent repair, cannot rent in_use, cannot return available — and why they differ from manual browser testing.
+**Problem/Correction:** None
+**My takeaway:** "Generated/guided by AI" in the brief means AI writes automated pytest tests, not that a human manually tests the app.
+
+---
+
+## Entry 079
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Write the critical rental tests.
+**What you provided:** conftest.py with in-memory SQLite fixtures and auth helpers; test_rental.py with 7 tests covering all rental guards plus happy paths — no live DB required.
+**Problem/Correction:** None
+**My takeaway:** Tests use SQLite in-memory via dependency override of get_db — completely isolated from Neon, all 7 passed first run.
+
+---
+
+## Entry 080
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Ran the rental tests — all 7 passed.
+**What you provided:** Confirmed 7/7 green. Flagged minor Pydantic v2 deprecation warning in config.py (class Config → model_config = ConfigDict).
+**Problem/Correction:** None
+**My takeaway:** Rental engine fully tested. One minor Pydantic deprecation warning to fix later.
+
+---
+
+## Entry 081
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Build the missing backend user management endpoints.
+**What you provided:** Updated `app/routers/users.py` with `GET /users` (list all, admin only) and `DELETE /users/{id}` (admin only, with self-delete guard).
+**Problem/Correction:** None
+**My takeaway:** Added self-delete guard — admin cannot delete their own account, preventing accidental lockout.
+
+---
+
+## Entry 082
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Build the admin panel frontend.
+**What you provided:** `AdminView.vue` with two tabs (Hardware and Users), `src/api/users.js`, updated `src/api/hardware.js` with createHardware, deleteHardware, toggleRepair calls.
+**Problem/Correction:** None
+**My takeaway:** Admin panel has two tabs — Hardware (add/delete/toggle repair) and Users (list/create/delete). Non-admins redirected at component level as extra guard on top of route meta.
+
+---
+
+## Entry 083
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Fix Vite import error for AdminView.vue.
+**What you provided:** Identified that the file wasn't placed in the correct directory.
+**Problem/Correction:** File was actually present — turned out to be a transient Vite cache issue that resolved itself.
+**My takeaway:** When Vite reports a missing file that exists, check the path casing and restart the dev server before debugging further.
