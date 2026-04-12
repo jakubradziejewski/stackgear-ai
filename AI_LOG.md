@@ -858,3 +858,69 @@
 **What you provided:** Identified that the file wasn't placed in the correct directory.
 **Problem/Correction:** File was actually present — turned out to be a transient Vite cache issue that resolved itself.
 **My takeaway:** When Vite reports a missing file that exists, check the path casing and restart the dev server before debugging further.
+
+---
+
+## Entry 084
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Whether WebSockets are worth adding before the AI layer.
+**What you provided:** Recommended trying python-socketio — if it doesn't meet expectations fall back to polling. Decided to proceed.
+**Problem/Correction:** None
+**My takeaway:** WebSockets are viable on Railway/Render free tier single dyno — no Redis needed at this scale.
+
+---
+
+## Entry 085
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Add WebSocket support via python-socketio.
+**What you provided:** `app/sockets.py` (AsyncServer), updated `main.py` wrapping FastAPI with `socketio.ASGIApp`, updated hardware router emitting `hardware_updated` after every state change. Uvicorn now points to `socket_app`.
+**Problem/Correction:** None
+**My takeaway:** Socket.io wraps FastAPI as ASGI middleware — uvicorn serves `socket_app` which delegates all non-socket requests to FastAPI underneath.
+
+---
+
+## Entry 086
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Updated DashboardView with socket.io client.
+**What you provided:** DashboardView with socket.io connection, `hardware_updated` listener that calls `loadHardware()`, live indicator dot, socket cleanup on unmount, socket disconnect on logout.
+**Problem/Correction:** None
+**My takeaway:** On rent/return the backend emits `hardware_updated` to all clients — all tabs update instantly without polling.
+
+---
+
+## Entry 087
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Fix socket reconnecting indefinitely — connection never established.
+**What you provided:** Diagnosed that browser was connecting to port 5173 (Vite) instead of 8000 (backend). Fixed by adding a WebSocket proxy rule to `vite.config.js` (`ws: true`) and removing the explicit URL from `io()` call.
+**Problem/Correction:** Initial fix attempt (adding path and transports) didn't work — root cause was Vite not proxying WebSocket upgrades. Required vite.config.js proxy change.
+**My takeaway:** In Vite dev setup, socket.io must go through the Vite proxy (`ws: true`) — pointing directly at the backend port doesn't work because the browser enforces same-origin for WS connections through the dev server.
+
+---
+
+## Entry 088
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Fix Return button not showing for the user who rented the item.
+**What you provided:** Root cause — `authStore.user` was missing `id` because JWT decode wasn't extracting `user_id` from the payload. Fix: add `id: payload.user_id` to the setAuth call in LoginView.
+**Problem/Correction:** None
+**My takeaway:** JWT payload uses `user_id` as the key (set in auth.py) — must be mapped to `id` in the user object stored in authStore so it matches `item.rented_by_id`.
+
+---
+
+## Entry 089
+
+**Date:** April 12, 2026
+**Tool:** Claude
+**What I asked for:** Explanation of ECONNRESET errors on startup and admin return behaviour.
+**What you provided:** ECONNRESET is a Vite proxy race condition on startup — harmless, disappears in production. Admin returning all items is correct by design.
+**Problem/Correction:** None
+**My takeaway:** ECONNRESET on dev startup is not a bug — it's the proxy trying to connect before the backend is ready. Non-issue in production.

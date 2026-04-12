@@ -33,6 +33,7 @@ async function handleLogin() {
     // We decode the token to get user info for now
     const payload = JSON.parse(atob(data.access_token.split('.')[1]))
     authStore.setAuth(data.access_token, {
+      id: payload.user_id,
       email: payload.email,
       is_admin: payload.is_admin,
     })
