@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import { fetchHardware, rentHardware, returnHardware } from '../api/hardware'
+import { io } from 'socket.io-client'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -12,6 +13,33 @@ const statusFilter = ref('')
 const sortBy = ref('name')
 const order = ref('asc')
 
+// ---------------------------------------------------------------------------
+// Socket.io — connect once, reload hardware on any change
+// ---------------------------------------------------------------------------
+const socket = io({
+  transports: ['websocket', 'polling'],
+  path: '/socket.io',
+})
+socket.on('connect', () => {
+  console.log('[socket] connected:', socket.id)
+})
+
+socket.on('hardware_updated', () => {
+  loadHardware()
+})
+
+socket.on('disconnect', () => {
+  console.log('[socket] disconnected')
+})
+
+// Clean up socket when leaving the page
+onUnmounted(() => {
+  socket.disconnect()
+})
+
+// ---------------------------------------------------------------------------
+// Hardware
+// ---------------------------------------------------------------------------
 async function loadHardware() {
   error.value = null
   try {
@@ -28,22 +56,24 @@ async function loadHardware() {
 async function handleRent(id) {
   try {
     await rentHardware(authStore.token, id)
-    await loadHardware()
+    // no need to call loadHardware() — socket event will trigger it
   } catch (e) {
     alert(e.message)
+    await loadHardware() // refresh anyway so UI reflects real state
   }
 }
 
 async function handleReturn(id) {
   try {
     await returnHardware(authStore.token, id)
-    await loadHardware()
   } catch (e) {
     alert(e.message)
+    await loadHardware()
   }
 }
 
 function logout() {
+  socket.disconnect()
   authStore.logout()
   router.push('/')
 }
@@ -82,6 +112,10 @@ onMounted(() => loadHardware())
         <option value="asc">Ascending</option>
         <option value="desc">Descending</option>
       </select>
+
+      <span style="font-size: 0.8rem; color: #999; align-self: center">
+        {{ socket.connected ? '● live' : '○ reconnecting…' }}
+      </span>
     </div>
 
     <p v-if="error" style="color: red">{{ error }}</p>

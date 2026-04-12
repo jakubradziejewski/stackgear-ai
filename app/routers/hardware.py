@@ -10,6 +10,7 @@ from app.models.hardware import Hardware
 from app.models.enums import HardwareStatus
 from app.models.user import User
 from app.schemas.hardware import HardwareCreate, HardwareRead, HardwareUpdate
+from app.sockets import sio
 
 router = APIRouter(prefix="/hardware", tags=["hardware"])
 
@@ -26,10 +27,13 @@ async def _get_or_404(hardware_id: str, db: AsyncSession) -> Hardware:
     return item
 
 
+async def _broadcast():
+    """Notify all connected clients that hardware state has changed."""
+    await sio.emit("hardware_updated")
+
+
 # ---------------------------------------------------------------------------
 # List  —  GET /hardware
-# Accessible to any authenticated user.
-# Supports optional filtering by status and sorting by name / purchase_date / status.
 # ---------------------------------------------------------------------------
 
 @router.get("", response_model=list[HardwareRead])
@@ -41,13 +45,10 @@ async def list_hardware(
     _: User = Depends(get_current_user),
 ) -> list[HardwareRead]:
     stmt = select(Hardware)
-
     if status_filter is not None:
         stmt = stmt.where(Hardware.status == status_filter)
-
     col = getattr(Hardware, sort_by)
     stmt = stmt.order_by(col.desc() if order == "desc" else col.asc())
-
     result = await db.execute(stmt)
     return [HardwareRead.model_validate(row) for row in result.scalars()]
 
@@ -72,6 +73,7 @@ async def create_hardware(
     )
     db.add(item)
     await db.flush()
+    await _broadcast()
     return HardwareRead.model_validate(item)
 
 
@@ -91,7 +93,6 @@ async def get_hardware(
 
 # ---------------------------------------------------------------------------
 # Update metadata  —  PATCH /hardware/{id}   (admin only)
-# Only edits name / brand / purchase_date / notes — not status.
 # ---------------------------------------------------------------------------
 
 @router.patch("/{hardware_id}", response_model=HardwareRead)
@@ -102,19 +103,15 @@ async def update_hardware(
     _: User = Depends(require_admin),
 ) -> HardwareRead:
     item = await _get_or_404(hardware_id, db)
-
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
-
     await db.flush()
+    await _broadcast()
     return HardwareRead.model_validate(item)
 
 
 # ---------------------------------------------------------------------------
 # Toggle repair  —  PATCH /hardware/{id}/repair   (admin only)
-# AVAILABLE  → REPAIR
-# REPAIR     → AVAILABLE
-# IN_USE     → 409  (must be returned first)
 # ---------------------------------------------------------------------------
 
 @router.patch("/{hardware_id}/repair", response_model=HardwareRead)
@@ -124,25 +121,23 @@ async def toggle_repair(
     _: User = Depends(require_admin),
 ) -> HardwareRead:
     item = await _get_or_404(hardware_id, db)
-
     if item.status == HardwareStatus.IN_USE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot toggle repair status while item is in use — return it first.",
         )
-
     item.status = (
         HardwareStatus.REPAIR
         if item.status == HardwareStatus.AVAILABLE
         else HardwareStatus.AVAILABLE
     )
     await db.flush()
+    await _broadcast()
     return HardwareRead.model_validate(item)
 
 
 # ---------------------------------------------------------------------------
 # Delete  —  DELETE /hardware/{id}   (admin only)
-# Blocked if currently rented out.
 # ---------------------------------------------------------------------------
 
 @router.delete("/{hardware_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -152,20 +147,17 @@ async def delete_hardware(
     _: User = Depends(require_admin),
 ) -> None:
     item = await _get_or_404(hardware_id, db)
-
     if item.status == HardwareStatus.IN_USE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Cannot delete an item that is currently rented out.",
         )
-
     await db.delete(item)
+    await _broadcast()
 
 
 # ---------------------------------------------------------------------------
 # Rent  —  POST /hardware/{id}/rent
-# Any authenticated user can rent.
-# Guard: only AVAILABLE items can be rented.
 # ---------------------------------------------------------------------------
 
 @router.post("/{hardware_id}/rent", response_model=HardwareRead)
@@ -175,34 +167,21 @@ async def rent_hardware(
     current_user: User = Depends(get_current_user),
 ) -> HardwareRead:
     item = await _get_or_404(hardware_id, db)
-
     if item.status == HardwareStatus.IN_USE:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Item is already rented out.",
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item is already rented out.")
     if item.status == HardwareStatus.REPAIR:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Item is under repair and cannot be rented.",
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item is under repair and cannot be rented.")
     if item.status == HardwareStatus.UNKNOWN:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Item has an unknown status and cannot be rented.",
-        )
-
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item has an unknown status and cannot be rented.")
     item.status = HardwareStatus.IN_USE
     item.rented_by_id = current_user.id
     await db.flush()
+    await _broadcast()
     return HardwareRead.model_validate(item)
 
 
 # ---------------------------------------------------------------------------
 # Return  —  POST /hardware/{id}/return
-# Any authenticated user can return — but only the person who rented it,
-# or an admin.
-# Guard: only IN_USE items can be returned.
 # ---------------------------------------------------------------------------
 
 @router.post("/{hardware_id}/return", response_model=HardwareRead)
@@ -212,21 +191,12 @@ async def return_hardware(
     current_user: User = Depends(get_current_user),
 ) -> HardwareRead:
     item = await _get_or_404(hardware_id, db)
-
     if item.status != HardwareStatus.IN_USE:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Item is not currently rented out.",
-        )
-
-    # Only the renter or an admin may return
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Item is not currently rented out.")
     if not current_user.is_admin and item.rented_by_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only return items you have rented.",
-        )
-
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only return items you have rented.")
     item.status = HardwareStatus.AVAILABLE
     item.rented_by_id = None
     await db.flush()
+    await _broadcast()
     return HardwareRead.model_validate(item)
