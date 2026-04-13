@@ -73,3 +73,12 @@ export async function toggleRepair(token, id) {
   }
   return response.json()
 }
+
+export async function runAudit(token) {
+  const response = await fetch(`${BASE_URL}/ai/audit`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.detail || 'Audit failed')
+  return data
+}

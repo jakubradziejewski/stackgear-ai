@@ -560,6 +560,7 @@
 **What you provided:** Explanation that `OAuth2PasswordBearer` implements the full OAuth2 spec which Swagger renders as a multi-field form; fix is to swap to `HTTPBearer` in `deps.py` — Swagger then shows a single token input field; token extraction changes from `token: str` to `credentials.credentials`
 **Problem/Correction:** None
 **My takeaway:** `OAuth2PasswordBearer` is correct for full OAuth2 flows but overkill here — `HTTPBearer` gives a cleaner Swagger experience and is the right choice when you're issuing your own JWTs without a separate OAuth2 authorization server
+
 ---
 
 ## Entry 057
@@ -924,3 +925,58 @@
 **What you provided:** ECONNRESET is a Vite proxy race condition on startup — harmless, disappears in production. Admin returning all items is correct by design.
 **Problem/Correction:** None
 **My takeaway:** ECONNRESET on dev startup is not a bug — it's the proxy trying to connect before the backend is ready. Non-issue in production.
+
+---
+
+## Entry 090
+
+**Date:** April 13, 2026
+**Tool:** Claude
+**What I asked for:** Plan for AI features — auditor, semantic search, and smart assistant.
+**What you provided:** Confirmed all three are worth building. Natural role split: auditor (admin only), semantic search (all users), assistant (all users). All share same Gemini setup with different prompts. Start with auditor.
+**Problem/Correction:** None
+**My takeaway:** Brief says "one of the following" but building all three is a strong differentiator — agreed to build them one at a time starting with auditor.
+
+---
+
+## Entry 091
+
+**Date:** April 13, 2026
+**Tool:** Claude
+**What I asked for:** Build the AI inventory auditor backend endpoint.
+**What you provided:** `app/routers/ai.py` with `GET /ai/audit` — fetches all hardware, serialises to JSON, sends to Gemini 2.0 Flash with a structured prompt, parses response into `AuditFinding` list with severity levels (error/warning/info). Updated `main.py` to register the router.
+**Problem/Correction:** None
+**My takeaway:** Prompt instructs Gemini to return raw JSON only — markdown fence stripping handles cases where the model wraps output in backticks anyway.
+
+---
+
+## Entry 092
+
+**Date:** April 13, 2026
+**Tool:** Claude
+**What I asked for:** Build the audit panel frontend.
+**What you provided:** `AuditPanel.vue` component with Run audit button, loading state, summary display, and colour-coded findings (error/warning/info). Added `runAudit` to hardware.js API file. Placed in views/ instead of components/ since no components folder exists yet.
+**Problem/Correction:** Initially suggested components/ folder — user correctly pointed out it doesn't exist yet, moved to views/.
+**My takeaway:** Keep files in existing folders rather than creating new structure unnecessarily at this stage.
+
+---
+
+## Entry 093
+
+**Date:** April 13, 2026
+**Tool:** Claude
+**What I asked for:** Fix Gemini quota exhaustion on free tier.
+**What you provided:** Diagnosed exhausted daily quota on gemini-2.0-flash. Listed available models with remaining quota. Recommended creating a fresh API key in Google AI Studio as the cleanest fix.
+**Problem/Correction:** Suggested gemini-1.5-flash-8b which returned 404 — model name was wrong. Then suggested gemini-3.1-flash-lite-preview as fallback.
+**My takeaway:** Always call `genai.list_models()` to verify available models before hardcoding a model name — free tier quotas reset daily so a fresh API key is the fastest fix.
+
+---
+
+## Entry 094
+
+**Date:** April 13, 2026
+**Tool:** Claude
+**What I asked for:** Confirmed auditor works — Gemini flagged all 4 seed anomalies correctly.
+**What you provided:** Confirmed all intentional seed issues were caught: Dell battery swelling safety hazard (available but dangerous), Logitech future purchase date 2027, Unknown Device bad status with missing data, iPad Pro "Appel" brand typo.
+**Problem/Correction:** None
+**My takeaway:** Auditor is fully working — Gemini identifies real operational issues from raw inventory data without being told what specific problems to look for. Strong demo moment for Pillar 3.

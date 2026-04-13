@@ -4,7 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import { fetchHardware, createHardware, deleteHardware, toggleRepair } from '../api/hardware'
 import { fetchUsers, createUser, deleteUser } from '../api/users'
-
+import AuditPanel from './AuditView.vue'
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -307,6 +307,6 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
-
+<AuditPanel />
   </div>
 </template>
