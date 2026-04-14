@@ -1057,3 +1057,14 @@
 **What you provided:** Explained likely upstream Gemini/provider-side failure path when non-AI routes stay healthy, and identified AI endpoints as the affected surface.
 **Problem/Correction:** None
 **My takeaway:** If core API works but AI endpoints fail, treat it as AI-provider availability/quota/error-path handling.
+
+---
+
+## Entry 102
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Refresh the frontend to look more elegant/modern and move styling out of Vue files into dedicated CSS.
+**What you provided:** Introduced a shared `modern-ui.css` theme, imported it globally, and refactored Login/Dashboard/Admin/Audit views to class-based styling with cleaner layout and consistent visual language.
+**Problem/Correction:** None
+**My takeaway:** Shared stylesheet + reusable UI classes gives a cleaner look while keeping behavior unchanged and easier to maintain.

@@ -24,6 +24,22 @@ const searchError = ref(null)
 const searchLoading = ref(false)
 const searchActive = ref(false)
 
+const socket = io({
+  transports: ['websocket', 'polling'],
+  path: '/socket.io',
+})
+
+function statusClass(status) {
+  return `status-pill status-${status}`
+}
+
+function statusLabel(status) {
+  if (status === 'in_use') return 'In use'
+  if (status === 'available') return 'Available'
+  if (status === 'repair') return 'Repair'
+  return 'Unknown'
+}
+
 async function loadHardware() {
   error.value = null
   try {
@@ -32,7 +48,7 @@ async function loadHardware() {
       sort_by: sortBy.value,
       order: order.value,
     })
-  } catch (e) {
+  } catch {
     error.value = 'Could not load hardware'
   }
 }
@@ -73,9 +89,7 @@ async function clearSemanticSearch({ reload = true } = {}) {
   searchLoading.value = false
   searchActive.value = false
 
-  if (reload) {
-    await loadHardware()
-  }
+  if (reload) await loadHardware()
 }
 
 async function refreshVisibleHardware() {
@@ -118,24 +132,13 @@ function logout() {
   router.push('/')
 }
 
-const socket = io({
-  transports: ['websocket', 'polling'],
-  path: '/socket.io',
-})
-
-socket.on('connect', () => {
-  console.log('[socket] connected:', socket.id)
-})
-
 socket.on('hardware_updated', () => {
   refreshVisibleHardware()
 })
 
-socket.on('disconnect', () => {
-  console.log('[socket] disconnected')
+onMounted(() => {
+  loadHardware()
 })
-
-onMounted(() => loadHardware())
 
 onUnmounted(() => {
   socket.disconnect()
@@ -143,18 +146,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div style="padding: 2rem; max-width: 960px; margin: 0 auto">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem">
-      <h1 style="margin: 0">Hardware Hub</h1>
-      <div style="display: flex; align-items: center; gap: 1rem">
-        <span style="font-size: 0.85rem; color: #666">{{ authStore.user?.email }}</span>
-        <button v-if="authStore.isAdmin" @click="router.push('/admin')">Admin panel</button>
-        <button @click="logout">Sign out</button>
+  <div class="page-shell">
+    <div class="page-header">
+      <div class="header-title">
+        <h1>Hardware Hub</h1>
+        <p>Live inventory with AI-assisted semantic search</p>
+      </div>
+      <div class="header-actions">
+        <span class="user-chip">{{ authStore.user?.email }}</span>
+        <button v-if="authStore.isAdmin" class="btn" @click="router.push('/admin')">Admin panel</button>
+        <button class="btn" @click="logout">Sign out</button>
       </div>
     </div>
 
-    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap">
-      <select v-model="statusFilter" @change="handleTableControlsChange">
+    <div class="toolbar">
+      <select v-model="statusFilter" class="control" @change="handleTableControlsChange">
         <option value="">All statuses</option>
         <option value="available">Available</option>
         <option value="in_use">In Use</option>
@@ -162,108 +168,86 @@ onUnmounted(() => {
         <option value="unknown">Unknown</option>
       </select>
 
-      <select v-model="sortBy" @change="handleTableControlsChange">
+      <select v-model="sortBy" class="control" @change="handleTableControlsChange">
         <option value="name">Sort by Name</option>
         <option value="purchase_date">Sort by Date</option>
         <option value="status">Sort by Status</option>
       </select>
 
-      <select v-model="order" @change="handleTableControlsChange">
+      <select v-model="order" class="control" @change="handleTableControlsChange">
         <option value="asc">Ascending</option>
         <option value="desc">Descending</option>
       </select>
 
-      <span style="font-size: 0.8rem; color: #999; align-self: center">
-        {{ socket.connected ? 'live' : 'reconnecting...' }}
+      <span class="live-dot" :class="{ 'is-live': socket.connected }">
+        {{ socket.connected ? 'Live updates' : 'Reconnecting...' }}
       </span>
     </div>
 
-    <div style="display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap">
+    <div class="search-row">
       <input
         v-model="semanticQuery"
+        class="control"
         type="text"
         placeholder="Describe what you need, for example: something to record a presentation"
-        style="flex: 1 1 420px; min-width: 260px; padding: 0.65rem 0.8rem"
         @keyup.enter="handleSemanticSearch"
       />
-      <button
-        @click="handleSemanticSearch"
-        :disabled="searchLoading"
-        style="padding: 0.65rem 1rem"
-      >
+      <button class="btn btn-primary" :disabled="searchLoading" @click="handleSemanticSearch">
         {{ searchLoading ? 'Searching...' : 'Search with AI' }}
       </button>
-      <button
-        v-if="searchActive || semanticQuery"
-        @click="clearSemanticSearch"
-        style="padding: 0.65rem 1rem"
-      >
-        Clear
-      </button>
+      <button v-if="searchActive || semanticQuery" class="btn" @click="clearSemanticSearch">Clear</button>
     </div>
 
-    <p v-if="error" style="color: red">{{ error }}</p>
-    <p v-if="searchError" style="color: red; margin-top: -0.25rem">{{ searchError }}</p>
+    <p v-if="error" class="alert-error">{{ error }}</p>
+    <p v-if="searchError" class="alert-error">{{ searchError }}</p>
 
-    <div
-      v-if="searchActive"
-      style="background: #f5f7fb; border: 1px solid #dbe3f0; border-radius: 8px; padding: 0.9rem 1rem; margin-bottom: 1rem"
-    >
-      <div style="font-size: 0.85rem; color: #4b5563; margin-bottom: 0.35rem">
-        Semantic matches for "{{ semanticQuery }}"
-      </div>
-      <div style="font-size: 0.95rem; color: #1f2937">
-        {{ searchSummary || 'Showing the closest matching gear.' }}
-      </div>
+    <div v-if="searchActive" class="hint-card">
+      <p>Semantic matches for "{{ semanticQuery }}"</p>
+      <p>{{ searchSummary || 'Showing the closest matching gear.' }}</p>
     </div>
 
-    <table v-if="hardware.length" style="width: 100%; border-collapse: collapse">
-      <thead>
-        <tr style="border-bottom: 2px solid #ddd; text-align: left">
-          <th style="padding: 8px">Name</th>
-          <th style="padding: 8px">Brand</th>
-          <th style="padding: 8px">Purchase Date</th>
-          <th style="padding: 8px">Status</th>
-          <th style="padding: 8px">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in hardware" :key="item.id" style="border-bottom: 1px solid #eee">
-          <td style="padding: 8px">{{ item.name }}</td>
-          <td style="padding: 8px">{{ item.brand || '-' }}</td>
-          <td style="padding: 8px">{{ item.purchase_date || '-' }}</td>
-          <td style="padding: 8px">
-            <span :style="{
-              padding: '2px 8px',
-              borderRadius: '10px',
-              fontSize: '0.8rem',
-              fontWeight: '500',
-              background: item.status === 'available' ? '#d4edda' : item.status === 'in_use' ? '#cce5ff' : item.status === 'repair' ? '#f8d7da' : '#e2e3e5',
-              color: item.status === 'available' ? '#155724' : item.status === 'in_use' ? '#004085' : item.status === 'repair' ? '#721c24' : '#383d41',
-            }">{{ item.status }}</span>
-          </td>
-          <td style="padding: 8px">
-            <button
-              v-if="item.status === 'available'"
-              @click="handleRent(item.id)"
-              style="font-size: 0.8rem; padding: 3px 10px; cursor: pointer"
-            >
-              Rent
-            </button>
-            <button
-              v-else-if="item.status === 'in_use' && (authStore.isAdmin || item.rented_by_id === authStore.user?.id)"
-              @click="handleReturn(item.id)"
-              style="font-size: 0.8rem; padding: 3px 10px; cursor: pointer"
-            >
-              Return
-            </button>
-            <span v-else style="font-size: 0.8rem; color: #999">-</span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div v-if="hardware.length" class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Brand</th>
+            <th>Purchase Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in hardware" :key="item.id">
+            <td>{{ item.name }}</td>
+            <td>{{ item.brand || '-' }}</td>
+            <td>{{ item.purchase_date || '-' }}</td>
+            <td>
+              <span :class="statusClass(item.status)">{{ statusLabel(item.status) }}</span>
+            </td>
+            <td>
+              <button
+                v-if="item.status === 'available'"
+                class="btn btn-primary btn-sm"
+                @click="handleRent(item.id)"
+              >
+                Rent
+              </button>
+              <button
+                v-else-if="item.status === 'in_use' && (authStore.isAdmin || item.rented_by_id === authStore.user?.id)"
+                class="btn btn-sm"
+                @click="handleReturn(item.id)"
+              >
+                Return
+              </button>
+              <span v-else class="muted">-</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <p v-else-if="!error" style="color: #666">
+    <p v-else-if="!error" class="empty-state">
       {{ searchActive ? 'No semantic matches found.' : 'No items found.' }}
     </p>
   </div>

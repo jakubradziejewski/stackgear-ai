@@ -29,8 +29,6 @@ async function handleLogin() {
       return
     }
 
-    // FastAPI returns { access_token, token_type }
-    // We decode the token to get user info for now
     const payload = JSON.parse(atob(data.access_token.split('.')[1]))
     authStore.setAuth(data.access_token, {
       id: payload.user_id,
@@ -39,7 +37,7 @@ async function handleLogin() {
     })
 
     router.push('/dashboard')
-  } catch (e) {
+  } catch {
     error.value = 'Could not reach the server'
   } finally {
     loading.value = false
@@ -48,16 +46,17 @@ async function handleLogin() {
 </script>
 
 <template>
-  <div class="login-wrapper">
-    <div class="login-box">
+  <div class="login-page">
+    <div class="card login-box">
       <h1>Hardware Hub</h1>
-      <p class="subtitle">Sign in to continue</p>
+      <p class="login-subtitle">Sign in to access your inventory workspace</p>
 
       <form @submit.prevent="handleLogin">
         <div class="field">
           <label>Email</label>
           <input
             v-model="email"
+            class="control"
             type="email"
             placeholder="admin@stackgear.com"
             required
@@ -65,90 +64,23 @@ async function handleLogin() {
           />
         </div>
 
-        <div class="field">
+        <div class="field mt-075">
           <label>Password</label>
           <input
             v-model="password"
+            class="control"
             type="password"
-            placeholder="••••••••"
+            placeholder="********"
             required
           />
         </div>
 
-        <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="alert-error mt-08">{{ error }}</p>
 
-        <button type="submit" :disabled="loading">
-          {{ loading ? 'Signing in…' : 'Sign in' }}
+        <button class="btn btn-primary mt-06 w-full" type="submit" :disabled="loading">
+          {{ loading ? 'Signing in...' : 'Sign in' }}
         </button>
       </form>
     </div>
   </div>
 </template>
-
-<style scoped>
-.login-wrapper {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f5f5f5;
-}
-.login-box {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-  width: 100%;
-  max-width: 360px;
-}
-h1 {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
-}
-.subtitle {
-  color: #666;
-  margin: 0 0 1.5rem;
-  font-size: 0.9rem;
-}
-.field {
-  margin-bottom: 1rem;
-}
-label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 1rem;
-  box-sizing: border-box;
-}
-input:focus {
-  outline: none;
-  border-color: #555;
-}
-button {
-  width: 100%;
-  padding: 0.6rem;
-  background: #111;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  cursor: pointer;
-  margin-top: 0.5rem;
-}
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-.error {
-  color: #c0392b;
-  font-size: 0.85rem;
-  margin: 0.5rem 0;
-}
-</style>
