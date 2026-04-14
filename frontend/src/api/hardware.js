@@ -82,3 +82,17 @@ export async function runAudit(token) {
   if (!response.ok) throw new Error(data.detail || 'Audit failed')
   return data
 }
+
+export async function semanticSearchHardware(token, query) {
+  const response = await fetch(`${BASE_URL}/ai/search`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ query }),
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.detail || 'Semantic search failed')
+  return data
+}

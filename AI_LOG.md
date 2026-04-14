@@ -980,3 +980,80 @@
 **What you provided:** Confirmed all intentional seed issues were caught: Dell battery swelling safety hazard (available but dangerous), Logitech future purchase date 2027, Unknown Device bad status with missing data, iPad Pro "Appel" brand typo.
 **Problem/Correction:** None
 **My takeaway:** Auditor is fully working — Gemini identifies real operational issues from raw inventory data without being told what specific problems to look for. Strong demo moment for Pillar 3.
+
+---
+
+## Entry 095
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Fix major app freezing when running AI audit/search and then navigating the dashboard.
+**What you provided:** Moved blocking Gemini SDK calls off the FastAPI event loop using `asyncio.to_thread(...)` with timeout protection, then reused the helper for both `/ai/audit` and `/ai/search`.
+**Problem/Correction:** Prior implementation called synchronous Gemini requests inside async routes, which could stall the entire app.
+**My takeaway:** AI calls must run outside the event loop in async FastAPI apps, otherwise one slow request can freeze unrelated UI behavior.
+
+---
+
+## Entry 096
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Hide raw Gemini errors (quota/timeouts/internal details) and show end users a clean message.
+**What you provided:** Added backend error masking so AI failures now return `503 Service Unavailable` with a generic message while real details are kept in server logs for debugging.
+**Problem/Correction:** None
+**My takeaway:** Users get a stable, friendly failure message while technical diagnostics remain in backend logs.
+
+---
+
+## Entry 097
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Build semantic search (plain English query -> inline hardware matches) using the same Gemini setup as the audit router.
+**What you provided:** Added `POST /ai/search`, wired dashboard search bar + inline result rendering, and added backend tests for semantic search response parsing.
+**Problem/Correction:** Initial implementation over-expanded shared AI flow and later needed simplification to better match existing audit behavior.
+**My takeaway:** Semantic search is best implemented as a focused endpoint that reuses Gemini config but keeps prompt/response handling independent from audit.
+
+---
+
+## Entry 098
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Search was hanging and audit felt broken; revert to the original audit approach and align search to that pattern.
+**What you provided:** Restored the lean audit path and simplified search prompt/data payload; removed behavior changes that affected the original audit UX.
+**Problem/Correction:** Prior edits introduced avoidable complexity and changed expected audit behavior.
+**My takeaway:** Keep the known-good audit flow stable and iterate search separately to avoid regressions.
+
+---
+
+## Entry 099
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Audit became worse with timeout messages; revert that behavior.
+**What you provided:** Removed frontend timeout wrapper from AI calls and returned to direct fetch behavior for audit/search requests.
+**Problem/Correction:** The added client timeout produced poor UX and masked the real underlying backend blocking issue.
+**My takeaway:** Timeout policy should be handled server-side with careful control, not as a blunt frontend abort for this app.
+
+---
+
+## Entry 100
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Clarify whether the `google.generativeai` deprecation warning is dangerous.
+**What you provided:** Confirmed app startup was healthy and explained this is a deprecation/maintenance risk rather than an immediate runtime failure.
+**Problem/Correction:** None
+**My takeaway:** Not an immediate blocker, but migration to `google.genai` should be planned.
+
+---
+
+## Entry 101
+
+**Date:** April 14, 2026
+**Tool:** Codex
+**What I asked for:** Diagnose `503 Service Unavailable` during AI operations.
+**What you provided:** Explained likely upstream Gemini/provider-side failure path when non-AI routes stay healthy, and identified AI endpoints as the affected surface.
+**Problem/Correction:** None
+**My takeaway:** If core API works but AI endpoints fail, treat it as AI-provider availability/quota/error-path handling.
