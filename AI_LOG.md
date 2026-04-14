@@ -1068,3 +1068,81 @@
 **What you provided:** Introduced a shared `modern-ui.css` theme, imported it globally, and refactored Login/Dashboard/Admin/Audit views to class-based styling with cleaner layout and consistent visual language.
 **Problem/Correction:** None
 **My takeaway:** Shared stylesheet + reusable UI classes gives a cleaner look while keeping behavior unchanged and easier to maintain.
+
+---
+
+## Entry 103
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Diagnose 400 Bad Request on OPTIONS /auth/login after frontend deployment to Vercel.  
+**What you provided:** Identified that Socket.IO's ASGIApp wrapper was intercepting preflight requests before FastAPI's CORSMiddleware could handle them. Fix: move CORS middleware to wrap socket_app (the outer ASGI app) using Starlette's CORSMiddleware directly, and remove it from the FastAPI app.  
+**Problem/Correction:** None  
+**My takeaway:** CORS middleware must wrap the outermost ASGI app. When Socket.IO wraps FastAPI, middleware on FastAPI never sees preflight OPTIONS requests.
+
+---
+
+## Entry 104
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Fix uvicorn serving the wrong app — CORS fix had no effect because Dockerfile was pointing to app.main:app instead of app.main:socket_app.  
+**What you provided:** Found the CMD in Dockerfile: uv run uvicorn app.main:app. Changed to app.main:socket_app so uvicorn serves the Socket.IO ASGI wrapper instead of the raw FastAPI app.  
+**Problem/Correction:** None  
+**My takeaway:** Always verify what uvicorn is actually serving. Dockerfile CMD overrides everything.
+
+---
+
+## Entry 105
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Fix frontend Socket.IO connecting to Vercel instead of Fly.io backend.  
+**What you provided:** Found io() call had no URL — defaulted to current origin. Fixed by passing import.meta.env.VITE_API_URL to io().  
+**Problem/Correction:** None  
+**My takeaway:** Always pass backend URL explicitly in production.
+
+---
+
+## Entry 106
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Fix Socket.IO live updates only working for one user at a time.  
+**What you provided:** Diagnosed multi-machine issue. Attempted Redis pub/sub via AsyncRedisManager.  
+**Problem/Correction:** Redis caused OOM on 256MB machines. Rolled back to single machine.  
+**My takeaway:** For small deployments, scale to one machine instead of adding a message broker.
+
+---
+
+## Entry 107
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Resolve persistent OOM kills after scaling to 1 machine.  
+**What you provided:** Removed redis and aioredis packages from environment.  
+**Problem/Correction:** None  
+**My takeaway:** Removing code is not enough — uninstall unused packages too.
+
+---
+
+## Entry 108
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Understand production infrastructure.  
+**What you provided:** Explained Fly.io backend, Vercel frontend, and free-tier setup.  
+**Problem/Correction:** None  
+**My takeaway:** Cloud deployment means no terminal dependency.
+
+---
+
+## Entry 109
+
+**Date:** April 14, 2026  
+**Tool:** Claude  
+**What I asked for:** Assess production readiness for 3 concurrent users.  
+**What you provided:** Identified cold starts, scaling limits, and config checks.  
+**Problem/Correction:** None  
+**My takeaway:** Before scaling: verify shared DB, fixed JWT secret, and CORS config.
+

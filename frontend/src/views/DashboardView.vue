@@ -24,7 +24,7 @@ const searchError = ref(null)
 const searchLoading = ref(false)
 const searchActive = ref(false)
 
-const socket = io({
+const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:8000', {
   transports: ['websocket', 'polling'],
   path: '/socket.io',
 })

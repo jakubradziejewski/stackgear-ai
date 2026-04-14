@@ -1,0 +1,65 @@
+# flyctl launch added from .gitignore
+# Byte-compiled / optimized / DLL files
+**\__pycache__
+**\*.py[codz]
+**\*$py.class
+
+# Distribution / packaging
+**\.Python
+**\build
+
+# Environments
+**\.env
+**\.venv
+
+# VS Code settings
+**\.vscode
+
+# flyctl launch added from .pytest_cache\.gitignore
+# Created by pytest automatically.
+.pytest_cache\**\*
+
+# flyctl launch added from .venv\.gitignore
+.venv\**\*
+
+# flyctl launch added from frontend\.gitignore
+# Logs
+frontend\**\logs
+frontend\**\*.log
+frontend\**\npm-debug.log*
+frontend\**\yarn-debug.log*
+frontend\**\yarn-error.log*
+frontend\**\pnpm-debug.log*
+frontend\**\lerna-debug.log*
+
+frontend\**\node_modules
+frontend\**\.DS_Store
+frontend\**\dist
+frontend\**\dist-ssr
+frontend\**\coverage
+frontend\**\*.local
+
+# Editor directories and files
+frontend\**\.vscode\*
+!frontend\**\.vscode\extensions.json
+frontend\**\.idea
+frontend\**\*.suo
+frontend\**\*.ntvs*
+frontend\**\*.njsproj
+frontend\**\*.sln
+frontend\**\*.sw?
+
+frontend\**\*.tsbuildinfo
+
+frontend\**\.eslintcache
+
+# Cypress
+frontend\cypress\videos
+frontend\cypress\screenshots
+
+# Vitest
+frontend\**\__screenshots__
+
+# Vite
+frontend\**\*.timestamp-*-*.mjs
+fly.toml
