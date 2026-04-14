@@ -1,4 +1,92 @@
-# AI Log — Hardware Hub (stackgear-ai)
+# AI Development Log — Hardware Hub (stackgear-ai)
+
+---
+
+## Overview
+
+This document is the complete, session-by-session AI development log for **Hardware Hub (stackgear-ai)** — a full-stack hardware rental management system with role-based access control, real-time WebSocket updates, and an AI-powered inventory auditor. The log covers 140 entries spanning from initial stack selection through to production deployment on Fly.io and Vercel.
+
+The log serves two purposes: it is a transparent record of every AI interaction that shaped the architecture, and it is an honest audit trail that includes every correction, misdiagnosis, and course correction along the way.
+
+---
+
+## 2. AI Development Log
+
+### Tooling
+
+Three AI tools were used across the project, each with a distinct role:
+
+- **Claude (Anthropic)** — Primary tool throughout. Used for architecture decisions, backend implementation (FastAPI, SQLAlchemy, Alembic, Pydantic, JWT auth), frontend implementation (Vue.js, Pinia, Vue Router), testing strategy (pytest, httpx), deployment configuration (Fly.io, Vercel, Docker), and debugging. Responsible for the majority of entries (001–102, 103–131, 132–140).
+- **Codex (OpenAI)** — Used during a focused mid-project sprint (entries 091–102) for building and iterating on the AI auditor, semantic search endpoint, and frontend UI refresh. Also used to diagnose and revert regressions introduced during that sprint.
+- **Gemini (Google)** — Used at the end of the project (entries 139–140) for automating Fly.io deployment via GitHub Actions and fixing a Windows-specific `.dockerignore` path issue in the CI pipeline.
+
+---
+
+### Data Strategy
+
+The project required loading a pre-supplied seed dataset of hardware items into the production database before the AI auditor could be demonstrated meaningfully. The dataset was intentionally dirty — it contained eight distinct anomalies:
+
+- A **duplicate ID** (two items sharing `id: 4`)
+- A **future purchase date** (`2027-01-15`) that has not yet occurred
+- A **non-ISO date format** (`DD-MM-YYYY` instead of `YYYY-MM-DD`)
+- A **brand typo** (`"Appel"` instead of `"Apple"`)
+- An **empty brand field**
+- A **null purchase date** with no value
+- An **invalid status string** (`"Unknown"` — casing mismatch with the enum)
+- **Inconsistent optional fields** — some items had `notes` and `history`, others did not
+
+**The strategic decision was to preserve all anomalies in the database**, not clean them up. The AI auditor's value is demonstrated precisely by it surfacing these issues at runtime. Cleaning the data would have removed the most compelling part of the feature.
+
+**AI-assisted challenge identification (Entry 018):** When the seed JSON was reviewed with Claude, it systematically flagged all eight anomalies and explained the implications of each for the data model — including that the `Hardware` model needed a nullable `brand`, nullable `purchase_date`, an `UNKNOWN` status enum value, and a `notes` field to accommodate the dirty data without rejecting rows.
+
+**The hardest data integration challenge** was getting all 11 seed items into the database. The pipeline broke at several layers:
+
+1. **Malformed DATABASE_URL** (Entry 046) — Missing `//` and username in the connection string caused all connection attempts to fail with a misleading timeout error rather than a clear parse error. Diagnosed only after inspecting the full masked URL structure.
+2. **Neon cold start timeouts** (Entry 043) — The free-tier Neon compute suspends after five minutes. Scripts run against a suspended compute produce timeout errors that look identical to connection failures. Fix: wake the compute via the dashboard, then run scripts immediately.
+3. **Non-ISO date rejection** (Entry 051–052) — Pydantic's `date` type accepts only ISO 8601 strings. The `DD-MM-YYYY` item was silently skipped entirely, leaving only 10/11 items in the database. Fix: a `field_validator` with `mode="before"` on `HardwareCreate` that pre-parses both formats before Pydantic's own type system runs.
+4. **Empty Alembic migrations** (Entry 019–021) — Alembic's `autogenerate` produced empty migration files because model imports were missing before `target_metadata` in `env.py`, and a `lambda` was used for `run_sync` instead of a named function, which was unreliable across Alembic versions.
+
+---
+
+### The Correction
+
+**The most significant suboptimal solution occurred across Entries 039–046: a prolonged misdiagnosis of a database connection failure.**
+
+**What happened:** After the seed script was built and the connection engine was configured, all connection attempts failed with a `TimeoutError`. Over seven entries, the AI cycled through increasingly specific hypotheses — SSL parameter format (`ssl='require'` vs `ssl=True` vs URL string), `channel_binding` requirements, asyncpg version compatibility, cold start timing — suggesting a new combination to test each time. Each test also timed out.
+
+**The actual root cause** (Entry 046) was that the `DATABASE_URL` in `.env` was malformed — missing the `//` separator and the username component. A correctly formed URL looks like `postgresql+asyncpg://user:password@host/db`. The stored URL was missing both, making every single connection attempt structurally impossible regardless of SSL configuration. Crucially, a malformed URL does not produce a clear parse error in asyncpg — it produces a `TimeoutError`, the same error as a genuine network timeout, which masked the real cause completely.
+
+**How it was identified:** In Entry 045, instead of suggesting another SSL variation, the AI was explicitly redirected: *"stop testing SSL combinations and show me how to print the full masked URL structure."* Printing the masked URL immediately revealed the malformed format.
+
+**How it was guided to the fix:** The correction came from applying a diagnostic principle the AI had stated earlier but not followed in practice: *"When all connection approaches fail, inspect the URL structure itself before trying more connection variations."* Holding the AI to its own stated principle — rather than continuing to follow its suggested experiments — broke the loop.
+
+**The broader lesson** recorded in the takeaway: when something works in one place (Alembic connected fine throughout) and not in another, the correct move is to copy the known-working configuration exactly and compare it to the failing one, rather than experimenting with alternatives. The Alembic engine config was the correct reference from the start.
+
+**A second notable correction** occurred at Entry 132–133 during production deployment. After the frontend was deployed to Vercel, all `OPTIONS` preflight requests to `/auth/login` returned `400 Bad Request`. The initial diagnosis focused on the CORS `allow_origins` list, but the fix had no effect. The root cause was architectural: Socket.IO's `ASGIApp` wrapper was the outermost ASGI application, and CORS middleware had been applied to the inner FastAPI app. Preflight `OPTIONS` requests are handled before they reach the inner app — the Socket.IO wrapper intercepted them first and returned 400. The fix was to move CORS middleware to wrap `socket_app` (the outer application) using Starlette's `CORSMiddleware` directly. This was further compounded by the Dockerfile still pointing `uvicorn` at `app.main:app` instead of `app.main:socket_app` (Entry 133), meaning the CORS fix was not even being served. Both issues were identified by reasoning about the ASGI request lifecycle rather than by experimenting with CORS configuration values.
+
+---
+
+### Prompt Trail
+
+The full session-by-session prompt history is contained in this document, starting at **Entry 001** below. Each entry records the exact request, what the AI provided, any correction or problem identified, and the takeaway. The entries are in chronological order and cover every significant architectural and implementation decision in the project.
+
+A summary of the key architectural decisions shaped by the AI dialogue:
+
+| Decision | Entry | Outcome |
+|---|---|---|
+| Stack selection and library additions | 001–003 | SQLAlchemy 2.0 over SQLModel; `uv` for package management; `services/` layer |
+| Database driver SSL handling | 013, 044, 046 | `connect_args={"ssl": "require"}` not URL params; NullPool for one-shot scripts |
+| Alembic env.py wiring | 019–021 | Named function for `run_sync`; explicit model imports before `target_metadata` |
+| Seed data strategy | 018, 028–029 | Preserve all anomalies; validate through Pydantic schemas even in seeding |
+| Auth implementation | 054–056 | `deps.py` in `core/`; `HTTPBearer` over `OAuth2PasswordBearer` for cleaner Swagger |
+| Real-time updates | 084–087 | `python-socketio` wrapping FastAPI as ASGI; Vite proxy with `ws: true` |
+| AI auditor architecture | 091 | Gemini 2.0 Flash; raw JSON prompt; `AuditFinding` list with severity levels |
+| CORS and Socket.IO ordering | 132 | CORS middleware must wrap the outermost ASGI app, not the inner FastAPI app |
+| Fly.io deployment | 120–121, 128 | Frankfurt (`fra`) region; `auto_stop_machines = true`; race condition false alarms in health checks |
+
+---
+
+## Exact AI Entries
 
 ---
 
@@ -1073,6 +1161,325 @@
 
 ## Entry 103
 
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Deployment guide for Hardware Hub — Vue.js frontend to Vercel, FastAPI backend to Fly.io, staying on free tier.
+**What you provided:** Full deployment guide covering Dockerfile + fly.toml for Fly.io (with auto_stop for free-tier safety), Vercel config with vercel.json SPA rewrite fix, VITE_API_URL env var wiring, CORS update pattern using Fly secrets, and a smoke test checklist.
+**Problem/Correction:** None
+**My takeaway:** The key free-tier safety lever on Fly.io is auto_stop_machines = true + min_machines_running = 0 — machine sleeps when idle and wakes on demand; critical to add vercel.json rewrites or Vue Router page refreshes will 404 on Vercel.
+
+---
+
+## Entry 104
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Which folder to run the Fly CLI global install command in.
+**What you provided:** Clarified it's a global install — folder doesn't matter — but the actual fly deploy commands must be run from the folder containing Dockerfile and fly.toml.
+**Problem/Correction:** None
+**My takeaway:** Global CLI tools (fly, vercel, npm) can be installed from any directory; deployment commands must be run from the project root where the config files live.
+
+---
+
+## Entry 105
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Fix for 404 error installing Fly CLI via npm.
+**What you provided:** The npm package name I gave earlier doesn't exist — correct install on Windows is the official PowerShell one-liner from fly.io.
+**Problem/Correction:** Previous response listed a non-existent npm package @fly-apps/fly-cli — should have only given the PowerShell installer for Windows.
+**My takeaway:** Fly CLI on Windows is installed via PowerShell script, not npm.
+
+---
+
+## Entry 106
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Install Fly CLI on Windows.
+**What you provided:** PowerShell one-liner — installed successfully to C:\Users\Jakub\.fly\bin\flyctl.exe.
+**Problem/Correction:** None
+**My takeaway:** Fly CLI installed successfully via PowerShell script — restart terminal then fly version to confirm.
+
+---
+
+## Entry 107
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Fix for fly not recognized after successful install.
+**What you provided:** The install dir C:\Users\Jakub\.fly\bin wasn't added to PATH — fix with $env:PATH for current session and SetEnvironmentVariable for permanent fix.
+**Problem/Correction:** None
+**My takeaway:** Fly installer on Windows doesn't always update PATH automatically — add it manually if the command isn't found after restart.
+
+---
+
+## Entry 108
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Verify Fly CLI works after PATH fix.
+**What you provided:** flyctl v0.4.34 confirmed working — proceed to flyctl auth login.
+**Problem/Correction:** None
+**My takeaway:** Use flyctl instead of fly on Windows until PATH is fully updated.
+
+---
+
+## Entry 109
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Next step after Fly login.
+**What you provided:** Asked to confirm project structure before creating deployment files.
+**Problem/Correction:** None
+**My takeaway:** Always verify folder structure before placing config files to avoid wrong paths.
+
+---
+
+## Entry 110
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Project structure confirmation before creating deployment files.
+**What you provided:** Confirmed structure — backend at project root with app/, frontend in frontend/. Need to see app/ contents and vite.config.js before writing files.
+**Problem/Correction:** None
+**My takeaway:** Dockerfile goes at project root, vercel.json goes in frontend/.
+
+---
+
+## Entry 111
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Create deployment files based on confirmed project structure.
+**What you provided:** Dockerfile, fly.toml (app name stackgear-ai, region waw), vercel.json (SPA rewrite), frontend/.env.production (points to stackgear-ai.fly.dev).
+**Problem/Correction:** None
+**My takeaway:** Need to check frontend API base URL wiring before deploying — if it's hardcoded to localhost the production build will call the wrong host.
+
+---
+
+## Entry 112
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Contents of .env.production file.
+**What you provided:** Single line VITE_API_URL=https://stackgear-ai.fly.dev — the file presenter didn't show dotfile content clearly.
+**Problem/Correction:** Dotfiles (starting with .) don't always render visibly in the file presenter — paste manually when that happens.
+**My takeaway:** For dotfiles, always paste content inline in chat rather than relying on the file presenter to show it.
+
+---
+
+## Entry 113
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Check frontend API base URL wiring.
+**What you provided:** BASE_URL was hardcoded — one-line fix to use import.meta.env.VITE_API_URL with localhost fallback.
+**Problem/Correction:** None
+**My takeaway:** All API files sharing BASE_URL need this one-line change — check if there are other API files before deploying.
+
+---
+
+## Entry 114
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Fix BASE_URL in users.js.
+**What you provided:** Same one-line fix as hardware.js — use import.meta.env.VITE_API_URL with localhost fallback.
+**Problem/Correction:** None
+**My takeaway:** Every API file needs the same BASE_URL fix — check all files in src/api before deploying.
+
+---
+
+## Entry 115
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Check if there are more hardcoded localhost URLs in the frontend.
+**What you provided:** Asked to check src/ structure and any auth API file.
+**Problem/Correction:** None
+**My takeaway:** Auth/login calls are often in a separate file outside src/api/ — must check before deploying.
+
+---
+
+## Entry 116
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Confirm all API files are covered.
+**What you provided:** Only hardware.js and users.js in src/api/ — both fixed. Need to check Pinia stores for any hardcoded localhost login calls.
+**Problem/Correction:** None
+**My takeaway:** Auth logic in Vue apps is often in a Pinia store, not a dedicated API file — always check stores too.
+
+---
+
+## Entry 117
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Check auth store for hardcoded URLs.
+**What you provided:** No URLs in the store — it's pure state. Login fetch is likely in LoginView.vue.
+**Problem/Correction:** None
+**My takeaway:** Pinia auth store only holds token/user state — the actual login API call is in the view.
+
+---
+
+## Entry 118
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Check LoginView.vue for hardcoded URLs.
+**What you provided:** Found hardcoded http://localhost:8000/auth/login — one-line fix using import.meta.env.VITE_API_URL with localhost fallback.
+**Problem/Correction:** None
+**My takeaway:** Login fetch in the view is the third and final hardcoded URL — all three locations now use the env variable.
+
+---
+
+## Entry 119
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Begin Fly.io backend deployment.
+**What you provided:** flyctl launch --no-deploy as first step with expected prompts and answers.
+**Problem/Correction:** None
+**My takeaway:** --no-deploy flag lets us set secrets before the first deploy — never deploy before secrets are set or the app will crash on startup.
+
+---
+
+## Entry 120
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Launch app on Fly.io.
+**What you provided:** waw (Warsaw) is not a valid Fly.io region — need to check valid region codes and pick the closest one to Poland.
+**Problem/Correction:** Suggested waw as a region which doesn't exist on Fly.io — should have verified valid region codes first.
+**My takeaway:** Always run flyctl platform regions before setting a region in fly.toml.
+
+---
+
+## Entry 121
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Fix invalid region in fly.toml.
+**What you provided:** fra (Frankfurt) is the closest valid Fly.io region to Gdynia, Poland.
+**Problem/Correction:** None
+**My takeaway:** Closest Fly.io region to Poland is Frankfurt (fra).
+
+---
+
+## Entry 122
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Confirm Fly.io launch settings.
+**What you provided:** Settings look correct — Frankfurt region, 256MB shared CPU, no databases. Proceed with N.
+**Problem/Correction:** None
+**My takeaway:** App configured correctly on Fly.io — next step is setting secrets before first deploy.
+
+---
+
+## Entry 123
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Whether to create .dockerignore from .gitignore files.
+**What you provided:** Yes — .dockerignore from .gitignore is correct, keeps venv/secrets/pycache out of the Docker build context.
+**Problem/Correction:** None
+**My takeaway:** Always say Y to .dockerignore generation — smaller, cleaner Docker image.
+
+---
+
+## Entry 124
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Next step after Fly app creation.
+**What you provided:** Set secrets before deploying — DATABASE_URL, SECRET_KEY, GEMINI_API_KEY from local .env file.
+**Problem/Correction:** None
+**My takeaway:** Never deploy before secrets are set — app will crash on startup if env vars are missing.
+
+---
+
+## Entry 125
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Where to run the secrets commands.
+**What you provided:** Run from project root where you already are — secrets go directly to Fly servers, not to any local file.
+**Problem/Correction:** None
+**My takeaway:** flyctl secrets set is run from anywhere in the project — it talks directly to Fly.io, no local file is created or modified.
+
+---
+
+## Entry 126
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Deploy backend to Fly.io after secrets are set.
+**What you provided:** flyctl deploy — first deploy takes 3–5 minutes to build and push Docker image.
+**Problem/Correction:** None
+**My takeaway:** Secrets must be set before first deploy — done correctly in right order.
+
+---
+
+## Entry 127
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Deploy backend to Fly.io.
+**What you provided:** Build succeeded and image pushed, but app isn't listening on 0.0.0.0:8000 — Fly proxy can't reach it. Need logs to diagnose startup failure.
+**Problem/Correction:** None yet — awaiting logs.
+**My takeaway:** Successful Docker build doesn't mean successful app start — always check logs after first deploy.
+
+---
+
+## Entry 128
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Diagnose Fly.io deployment warning about app not listening.
+**What you provided:** Logs show both machines started successfully with uvicorn on 0.0.0.0:8000 — the deploy warning was a race condition false alarm, not a real failure.
+**Problem/Correction:** Initial deploy warning looked alarming but logs confirm app is healthy.
+**My takeaway:** Always check flyctl logs after a deploy warning — the machine may have started correctly after the health check window.
+
+---
+
+## Entry 129
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Confirm backend is live and proceed to frontend deployment.
+**What you provided:** Backend confirmed live — next step is updating CORS in main.py before deploying frontend to Vercel.
+**Problem/Correction:** None
+**My takeaway:** Always update CORS before deploying frontend — otherwise the browser will block all API calls from the Vercel domain.
+
+---
+
+## Entry 130
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Check CORS config in main.py before frontend deploy.
+**What you provided:** Wildcard *.vercel.app doesn't work in CORS — must use exact URL https://stackgear-ai.vercel.app.
+**Problem/Correction:** None
+**My takeaway:** CORS allow_origins requires exact URLs — wildcards are not supported by the browser CORS spec.
+
+---
+
+## Entry 131
+
+**Date:** April 14, 2026
+**Tool:** Claude
+**What I asked for:** Deploy frontend to Vercel.
+**What you provided:** vercel --prod command with expected prompts and answers.
+**Problem/Correction:** None
+**My takeaway:** Run vercel --prod from inside the frontend/ folder — Vercel auto-detects Vite and sets build command to npm run build and output to dist.
+
+---
+
+## Entry 132
+
 **Date:** April 14, 2026  
 **Tool:** Claude  
 **What I asked for:** Diagnose 400 Bad Request on OPTIONS /auth/login after frontend deployment to Vercel.  
@@ -1082,7 +1489,7 @@
 
 ---
 
-## Entry 104
+## Entry 133
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1093,7 +1500,7 @@
 
 ---
 
-## Entry 105
+## Entry 134
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1104,7 +1511,7 @@
 
 ---
 
-## Entry 106
+## Entry 135
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1115,7 +1522,7 @@
 
 ---
 
-## Entry 107
+## Entry 136
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1126,7 +1533,7 @@
 
 ---
 
-## Entry 108
+## Entry 137
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1137,7 +1544,7 @@
 
 ---
 
-## Entry 109
+## Entry 138
 
 **Date:** April 14, 2026  
 **Tool:** Claude  
@@ -1146,3 +1553,26 @@
 **Problem/Correction:** None  
 **My takeaway:** Before scaling: verify shared DB, fixed JWT secret, and CORS config.
 
+---
+
+## Entry 139
+
+**Date:** April 14, 2026  
+**Tool:** Gemini  
+**What I asked for:** Automate Fly.io deployment using GitHub Secrets.  
+**What you provided:** Explained the connection between `FLY_API_TOKEN` and GitHub Actions; provided a YAML workflow.  
+**Problem/Correction:** None.  
+**My takeaway:** GitHub Secrets allow the repository to act as the deployment trigger instead of my local terminal.
+
+---
+
+## Entry 140
+
+**Date:** April 14, 2026  
+**Tool:** Gemini  
+**What I asked for:** Fix "excludepatterns syntax error" during Docker build in GitHub Actions.  
+**What you provided:** Identified that Windows backslashes (`\`) in `.dockerignore` break the Linux-based Docker builder.  
+**Problem/Correction:** Replaced Windows-style paths with standard forward slashes (`/`).  
+**My takeaway:** Docker configuration files must use POSIX-compliant paths (forward slashes) even when developed on Windows.
+
+---
