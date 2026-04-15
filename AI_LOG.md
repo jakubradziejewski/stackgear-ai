@@ -1576,3 +1576,133 @@ A summary of the key architectural decisions shaped by the AI dialogue:
 **My takeaway:** Docker configuration files must use POSIX-compliant paths (forward slashes) even when developed on Windows.
 
 ---
+
+## Entry 141
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Fix Fly.io GitHub Actions deployment failing with "trial has ended" error after Fly.io ended their no-card free tier.
+**What you provided:** Explained Fly.io's policy change and recommended Render as the best no-card free alternative — Dockerfile works as-is, only the host URL changes.
+**Problem/Correction:** None
+**My takeaway:** Free hosting tiers change without warning — always have a fallback platform in mind; Render is the closest no-card drop-in for Fly.io Docker deployments.
+
+---
+
+## Entry 142
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Step-by-step migration from Fly.io to Render given current project state.
+**What you provided:** Full migration guide — Render app creation via public GitHub URL, Docker builder, port 8000, Frankfurt region, env vars, CORS update, Vercel VITE_API_URL update, GitHub Actions workflow removal, fly.toml deletion.
+**Problem/Correction:** None
+**My takeaway:** Render auto-deploys on every push to main natively — GitHub Actions workflow for deployment is no longer needed and should be deleted to avoid Fly.io deploy errors on every push.
+
+---
+
+## Entry 143
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Koyeb as alternative after Fly.io, then discovered Koyeb also requires a credit card for their Pro plan ($30/month).
+**What you provided:** Confirmed Koyeb also changed their policy and redirected to Render as the last genuinely free no-card option.
+**Problem/Correction:** None
+**My takeaway:** Both Fly.io and Koyeb have moved to paid-only models — Render remains the only major platform with a true no-card free tier for Docker deployments as of April 2026.
+
+---
+
+## Entry 144
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Whether the Render free tier upgrade prompt about spin-down and missing features is a problem.
+**What you provided:** Confirmed none of the missing free-tier features are needed — no SSH, no scaling, no persistent disk required; spin-down is the same behaviour as Fly.io auto_stop_machines and is acceptable for a demo.
+**Problem/Correction:** None
+**My takeaway:** Render free tier is sufficient for this project — the only operational concern is the 15-minute spin-down before demos.
+
+---
+
+## Entry 145
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Which environment variables to set in Render dashboard.
+**What you provided:** The three required vars — DATABASE_URL, SECRET_KEY, GEMINI_API_KEY — same values as local .env file.
+**Problem/Correction:** None
+**My takeaway:** Render env vars replace Fly.io secrets exactly — same keys, same values, different dashboard.
+
+---
+
+## Entry 146
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Which Render advanced settings to configure (health check, auto-deploy, Dockerfile path, etc).
+**What you provided:** Set health check path to /health, leave auto-deploy on, leave Dockerfile path and Docker command as defaults — everything else is not needed.
+**Problem/Correction:** None
+**My takeaway:** Render correctly infers Dockerfile at repo root — only the health check path needs to be set manually.
+
+---
+
+## Entry 147
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Diagnose "Not Found" on the Render service URL after successful deploy.
+**What you provided:** Explained that / returning Not Found is correct — FastAPI has no route at the root path. Real test is /health. The x-render-routing: no-server header in the browser DevTools revealed Render's proxy hadn't registered the port yet — resolved itself within seconds.
+**Problem/Correction:** None
+**My takeaway:** x-render-routing: no-server means the proxy hasn't registered the port yet, not that the app crashed — check logs and wait a few seconds before diagnosing further.
+
+---
+
+## Entry 148
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Frontend still not connecting after backend confirmed live on Render.
+**What you provided:** Identified two issues — CORS allow_origins still referenced stackgear-ai.vercel.app but actual Vercel domain is stackgear.vercel.app; and VITE_API_URL in Vercel dashboard was not yet set, so frontend was still calling the old Fly.io URL.
+**Problem/Correction:** None
+**My takeaway:** After any backend host change, update both CORS allow_origins in main.py and VITE_API_URL in the Vercel dashboard — missing either one breaks the frontend silently.
+
+---
+
+## Entry 149
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** How to trigger a fresh Vercel production deployment to pick up the new VITE_API_URL env var.
+**What you provided:** Run vercel --prod from the frontend/ folder — forces a new build that picks up the updated env var from the Vercel dashboard.
+**Problem/Correction:** None
+**My takeaway:** Vercel does not automatically rebuild when env vars are changed in the dashboard — must trigger a manual redeploy or push a new commit to pick up the change.
+
+---
+
+## Entry 150
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Remove GitHub Actions Fly.io workflow and fly.toml after confirming Render works.
+**What you provided:** git rm commands for both files plus a commit message; confirmed Render's native GitHub integration replaces the workflow entirely.
+**Problem/Correction:** None
+**My takeaway:** Removing dead config files immediately after a platform migration prevents confusion and stops failed CI runs on every push.
+
+---
+
+## Entry 151
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Render free tier limits relevant to surviving two days until the presentation.
+**What you provided:** Key limits — 750 free hours/month (single service is fine), 512MB RAM (headroom over the 256MB Fly setup), 15-minute spin-down with ~30-60s cold start, 1-hour log retention. Only actionable item: open /health 2 minutes before the presentation to wake the service.
+**Problem/Correction:** None
+**My takeaway:** The only pre-presentation action required is waking the backend by visiting the health check URL — everything else is within comfortable free-tier limits for a demo with a handful of users.
+
+---
+
+## Entry 152
+
+**Date:** April 15, 2026
+**Tool:** Claude
+**What I asked for:** Whether seed_users.py hardcoded admin password should be moved to an environment variable.
+**What you provided:** Confirmed it should — added os.getenv("ADMIN_PASSWORD", "admin123") with the hardcoded string as fallback only; updated .env, .env.example, and Render env vars accordingly.
+**Problem/Correction:** None
+**My takeaway:** Seed credentials in a public repo should always come from env vars — the hardcoded fallback is acceptable only as a local dev convenience, never as the production value.
