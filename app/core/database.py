@@ -1,5 +1,3 @@
-from urllib.parse import urlsplit
-
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -27,14 +25,6 @@ def create_database_engine(*, echo: bool = False, use_pool: bool = True, **kwarg
 
     engine_kwargs.update(kwargs)
     return create_async_engine(settings.async_database_url, **engine_kwargs)
-
-
-def database_endpoint_summary() -> str:
-    parts = urlsplit(settings.async_database_url)
-    host = parts.hostname or "<missing-host>"
-    port = parts.port or 5432
-    database = parts.path.lstrip("/") or "<missing-database>"
-    return f"{host}:{port}/{database}"
 
 
 engine = create_database_engine(echo=True)

@@ -14,11 +14,7 @@ from app.sockets import sio
 
 router = APIRouter(prefix="/hardware", tags=["hardware"])
 
-
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
-
 async def _get_or_404(hardware_id: str, db: AsyncSession) -> Hardware:
     result = await db.execute(select(Hardware).where(Hardware.id == hardware_id))
     item = result.scalar_one_or_none()
@@ -31,11 +27,7 @@ async def _broadcast():
     """Notify all connected clients that hardware state has changed."""
     await sio.emit("hardware_updated")
 
-
-# ---------------------------------------------------------------------------
 # List  —  GET /hardware
-# ---------------------------------------------------------------------------
-
 @router.get("", response_model=list[HardwareRead])
 async def list_hardware(
     status_filter: HardwareStatus | None = Query(None, alias="status"),
@@ -52,11 +44,7 @@ async def list_hardware(
     result = await db.execute(stmt)
     return [HardwareRead.model_validate(row) for row in result.scalars()]
 
-
-# ---------------------------------------------------------------------------
 # Create  —  POST /hardware   (admin only)
-# ---------------------------------------------------------------------------
-
 @router.post("", response_model=HardwareRead, status_code=status.HTTP_201_CREATED)
 async def create_hardware(
     payload: HardwareCreate,
@@ -77,10 +65,7 @@ async def create_hardware(
     return HardwareRead.model_validate(item)
 
 
-# ---------------------------------------------------------------------------
 # Get one  —  GET /hardware/{id}
-# ---------------------------------------------------------------------------
-
 @router.get("/{hardware_id}", response_model=HardwareRead)
 async def get_hardware(
     hardware_id: str,
@@ -91,10 +76,7 @@ async def get_hardware(
     return HardwareRead.model_validate(item)
 
 
-# ---------------------------------------------------------------------------
 # Update metadata  —  PATCH /hardware/{id}   (admin only)
-# ---------------------------------------------------------------------------
-
 @router.patch("/{hardware_id}", response_model=HardwareRead)
 async def update_hardware(
     hardware_id: str,
@@ -109,11 +91,7 @@ async def update_hardware(
     await _broadcast()
     return HardwareRead.model_validate(item)
 
-
-# ---------------------------------------------------------------------------
 # Toggle repair  —  PATCH /hardware/{id}/repair   (admin only)
-# ---------------------------------------------------------------------------
-
 @router.patch("/{hardware_id}/repair", response_model=HardwareRead)
 async def toggle_repair(
     hardware_id: str,
@@ -135,11 +113,7 @@ async def toggle_repair(
     await _broadcast()
     return HardwareRead.model_validate(item)
 
-
-# ---------------------------------------------------------------------------
 # Delete  —  DELETE /hardware/{id}   (admin only)
-# ---------------------------------------------------------------------------
-
 @router.delete("/{hardware_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_hardware(
     hardware_id: str,
@@ -155,11 +129,7 @@ async def delete_hardware(
     await db.delete(item)
     await _broadcast()
 
-
-# ---------------------------------------------------------------------------
 # Rent  —  POST /hardware/{id}/rent
-# ---------------------------------------------------------------------------
-
 @router.post("/{hardware_id}/rent", response_model=HardwareRead)
 async def rent_hardware(
     hardware_id: str,
@@ -179,11 +149,7 @@ async def rent_hardware(
     await _broadcast()
     return HardwareRead.model_validate(item)
 
-
-# ---------------------------------------------------------------------------
 # Return  —  POST /hardware/{id}/return
-# ---------------------------------------------------------------------------
-
 @router.post("/{hardware_id}/return", response_model=HardwareRead)
 async def return_hardware(
     hardware_id: str,

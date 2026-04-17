@@ -30,13 +30,13 @@ async def main():
             await engine.dispose()
             return
 
-        print("Seeding stackgear-ai...\n")
+        print("Seeding stackgear-ai\n")
 
         await seed_users(session)
         await seed_hardware(session)
 
         await session.commit()
-        print(f"\n✓ Seed complete.")
+        print(f"\nSeed complete.")
 
     await engine.dispose()
 

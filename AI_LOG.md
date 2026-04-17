@@ -4,7 +4,7 @@
 
 ## Overview
 
-This document is the complete, session-by-session AI development log for **Hardware Hub (stackgear-ai)** — a full-stack hardware rental management system with role-based access control, real-time WebSocket updates, and an AI-powered inventory auditor. The log covers 140 entries spanning from initial stack selection through to production deployment on Fly.io and Vercel.
+This document is the complete, session-by-session AI development log for **Hardware Hub (stackgear-ai)** — a full-stack hardware rental management system with role-based access control, real-time WebSocket updates, and an AI-powered inventory auditor. The log covers 140 entries spanning from initial stack selection through to production deployment on Render and Vercel.
 
 The log serves two purposes: it is a transparent record of every AI interaction that shaped the architecture, and it is an honest audit trail that includes every correction, misdiagnosis, and course correction along the way.
 

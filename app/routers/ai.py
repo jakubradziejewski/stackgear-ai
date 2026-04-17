@@ -1,11 +1,3 @@
-"""
-app/routers/ai.py
-
-AI-powered features:
-  GET  /ai/audit   - Inventory auditor (admin only)
-  POST /ai/search  - Semantic hardware search
-"""
-
 import asyncio
 import json
 import logging
@@ -32,11 +24,6 @@ model = genai.GenerativeModel("gemini-2.5-flash-lite")
 GEMINI_TIMEOUT_SECONDS = 12
 AI_UNAVAILABLE_MESSAGE = "AI service is temporarily unavailable. Please try again."
 
-
-# ---------------------------------------------------------------------------
-# Schema
-# ---------------------------------------------------------------------------
-
 class AuditFinding(BaseModel):
     item: str
     severity: str  # "info" | "warning" | "error"
@@ -55,11 +42,6 @@ class SearchRequest(BaseModel):
 class SearchResponse(BaseModel):
     items: list[HardwareRead]
     summary: str
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _serialize_inventory(items: list[Hardware]) -> str:
     """Convert hardware rows to a clean JSON string for the audit prompt."""
@@ -202,11 +184,6 @@ Inventory data:
 {inventory}
 """
 
-
-# ---------------------------------------------------------------------------
-# GET /ai/audit
-# ---------------------------------------------------------------------------
-
 @router.get("/audit", response_model=AuditResponse)
 async def audit_inventory(
     db: AsyncSession = Depends(get_db),
@@ -226,11 +203,6 @@ async def audit_inventory(
         findings=[AuditFinding(**finding) for finding in data.get("findings", [])],
         summary=data.get("summary", ""),
     )
-
-
-# ---------------------------------------------------------------------------
-# POST /ai/search
-# ---------------------------------------------------------------------------
 
 @router.post("/search", response_model=SearchResponse)
 async def semantic_search(
